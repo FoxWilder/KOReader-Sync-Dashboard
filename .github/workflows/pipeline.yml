@@ -1,0 +1,66 @@
+name: "Release & Automation"
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install --include=dev
+
+      - name: Build Application
+        run: npm run build
+        continue-on-error: true # In case build script is not standard yet
+
+      - name: Prepare Release ZIP
+        run: |
+          mkdir -p release
+          # Include necessary runtime files
+          cp -r package.json setup.ps1 migrate.py check_environment.py release/
+          # Include build output (adjust 'build' or 'dist' based on framework)
+          [ -d build ] && cp -r build release/ || true
+          [ -d dist ] && cp -r dist release/ || true
+          [ -d .svelte-kit ] && cp -r .svelte-kit release/ || true
+          zip -r sake-release.zip release/
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sake-release.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+
+      - name: Setup Pages
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'docs' # User can place a landing page in docs/
+
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: actions/deploy-pages@v4

@@ -1,20 +1,51 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 📚 KOReader Sync Dashboard
 
-# Run and deploy your AI Studio app
+A polished, **Docker-free** fork of [Sudashiii/Sake](https://github.com/Sudashiii/Sake) optimized for Windows Server 2025. This project provides a clean web library, KOReader progress syncing, and book provider imports without the complexity of Docker.
 
-This contains everything you need to run your app locally.
+## 🚀 One-Line Installation / Upgrade
 
-View your app in AI Studio: https://ai.studio/apps/6c39bcc4-bda4-41e3-8299-e73f5ff15dcd
+Run the following command in PowerShell in the folder where you want to install or upgrade the dashboard:
 
-## Run Locally
+```powershell
+iwr -useb https://raw.githubusercontent.com/FoxWilder/KOReader-Sync-Dashboard/main/install.ps1 | iex
+```
 
-**Prerequisites:**  Node.js
+*This script automatically detects existing installations and performs an upgrade while preserving your `sake.db` and `.env` settings.*
 
+## ✨ Features
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- **Docker-Free**: Runs natively using Node.js and Python.
+- **SQLite Database**: Replaces PostgreSQL for zero-config local storage.
+- **Local Storage**: Replaces MinIO/S3 with standard filesystem storage.
+- **Automated Workflow**: 
+  - **Releases**: Every tag upload triggers a new GitHub Release with a bundled ZIP.
+  - **Preview**: A web landing page is automatically deployed to GitHub Pages.
+- **Windows Server Optimized**: Tailored for the Windows Server 2025 environment.
+
+## 🛠️ Manual Instructions
+
+If you prefer manual setup, follow these steps:
+
+1. **Clone the repo**:
+   ```bash
+   git clone https://github.com/FoxWilder/KOReader-Sync-Dashboard.git
+   cd KOReader-Sync-Dashboard
+   ```
+2. **Run Setup**:
+   ```powershell
+   ./setup.ps1
+   ```
+3. **Start the App**:
+   ```bash
+   npm run dev
+   ```
+
+## 🤖 Automation
+
+This project uses **GitHub Actions** to automate its lifecycle:
+- **Build & Package**: On every push to `main`, the app is built and packaged.
+- **GitHub Pages**: The project info page is hosted at [foxwilder.github.io/KOReader-Sync-Dashboard](https://foxwilder.github.io/KOReader-Sync-Dashboard).
+- **Auto-Releases**: Tagged versions (e.g., `v1.0.0`) automatically create a GitHub Release with assets.
+
+## 📄 License
+This project inherits the license of the original [Sake](https://github.com/Sudashiii/Sake) project.

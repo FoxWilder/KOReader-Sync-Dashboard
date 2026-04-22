@@ -1,6 +1,6 @@
 {
-  "name": "Sake Non-Docker Setup",
-  "description": "Migration and setup tools for running Sudashiii/Sake without Docker using PowerShell and Node.js/Python.",
+  "name": "KOReader Sync Dashboard",
+  "description": "A refined, Docker-free fork of Sudashiii/Sake for hosting your reading stack on Windows Server 2025. Includes automated releases and easy PowerShell setup.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }
