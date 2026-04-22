@@ -45,9 +45,13 @@ npm install
 if ($LASTEXITCODE -ne 0) { Write-Error "NPM install failed."; exit 1 }
 
 # 4. Build Application
-Write-Host "Building application for production..."
+Write-Host "Building frontend application..."
 npm run build
-if ($LASTEXITCODE -ne 0) { Write-Error "Build failed."; exit 1 }
+if ($LASTEXITCODE -ne 0) { Write-Error "Frontend build failed."; exit 1 }
+
+Write-Host "Building server application..."
+npm run build:server
+if ($LASTEXITCODE -ne 0) { Write-Error "Server build failed."; exit 1 }
 
 # 5. Database Setup (Drizzle)
 Write-Host "Initializing database..."

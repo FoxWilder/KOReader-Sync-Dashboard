@@ -141,20 +141,16 @@ try {
 # General cleanup of node processes started by us
 Get-Process | Where-Object { $_.Name -like "*node*" -and ($_.CommandLine -like "*server.ts*" -or $_.Path -like "*$installDir*") } | Stop-Process -Force -ErrorAction SilentlyContinue
 
-Write-Log "Starting Wilder Dashboard service (Production Mode)..." "Cyan"
-$npmCmd = "npm"
-if ($IsWindows) { $npmCmd = "npm.cmd" }
+Write-Log "Starting Wilder Dashboard service (Bundled Node Mode)..." "Cyan"
+$nodeExe = (Get-Command node).Source
 
-# Set environment variables for the background process at the session level
-# This is compatible with PowerShell 5.1 where Start-Process lacks the -Environment parameter
-$env:NODE_ENV = "production"
-
-# Use 'npm start' which forces production mode via --prod flag
-$process = Start-Process -FilePath $npmCmd -ArgumentList "start" -WindowStyle Hidden -PassThru -WorkingDirectory $installDir
+# Use 'node' directly on the bundled server for maximum stability
+# We use -NoNewWindow and redirect manually if needed, but the server handles its own logging
+$process = Start-Process -FilePath $nodeExe -ArgumentList "dist/server.cjs --prod" -WindowStyle Hidden -PassThru -WorkingDirectory $installDir
 
 if ($process) {
     Write-Log "Dashboard is starting (PID: $($process.Id))." "Green"
-    Write-Log "Waiting for listening state (max 60s)..." "Yellow"
+    Write-Log "Confirming production mode and listening state..." "Yellow"
     
     $retry = 0
     $found = $false

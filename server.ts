@@ -33,9 +33,17 @@ async function startServer() {
   if (!isProd) logToFile('service_log.txt', `Note: Raw NODE_ENV was "${process.env.NODE_ENV}", isProdFlag was ${isProdFlag}`);
 
   // Start listening IMMEDIATELY to prevent parent process hangs and confirm port ownership
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     logToFile('service_log.txt', `Server successfully listening on http://0.0.0.0:${PORT}`);
     console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  server.on('error', (err: any) => {
+    logToFile('service_log.txt', `SERVER LISTENER ERROR: ${err.message}`);
+    if (err.code === 'EADDRINUSE') {
+      logToFile('service_log.txt', `Port ${PORT} is already in use by another process.`);
+    }
+    console.error('Server error:', err);
   });
 
   try {
