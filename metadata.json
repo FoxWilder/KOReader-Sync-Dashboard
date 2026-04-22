@@ -1,5 +1,5 @@
 {
-  "name": "KOReader Sync Dashboard",
+  "name": "Wilder Sync",
   "description": "A refined, Docker-free fork of Sudashiii/Sake for hosting your reading stack on Windows Server 2025. Includes automated releases and easy PowerShell setup.",
   "requestFramePermissions": [],
   "majorCapabilities": []

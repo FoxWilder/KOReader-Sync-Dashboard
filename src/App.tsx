@@ -38,6 +38,9 @@ interface Book {
   title: string;
   author: string;
   description?: string;
+  publisher?: string;
+  publishedDate?: string;
+  language?: string;
   coverPath: string;
   status: 'library' | 'reading' | 'queue' | 'archived' | 'trash';
   isReading: number;
@@ -74,8 +77,35 @@ export default function App() {
   const fetchBooks = async () => {
     if (isPreview) {
       setBooks([
-        { id: '1', title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', coverPath: '', status: 'reading', isReading: 1, progress: '{"percentage": 45}', size: 1024 * 500, format: 'epub' },
-        { id: '2', title: '1984', author: 'George Orwell', coverPath: '', status: 'queue', isReading: 0, size: 1024 * 800, format: 'epub' },
+        { 
+          id: '1', 
+          title: 'The Great Gatsby', 
+          author: 'F. Scott Fitzgerald', 
+          description: 'A classic novel of the Jazz Age, exploring themes of wealth, love, and the American Dream.',
+          publisher: 'Charles Scribner\'s Sons',
+          publishedDate: '1925',
+          language: 'en',
+          coverPath: '', 
+          status: 'reading', 
+          isReading: 1, 
+          progress: '{"percentage": 45}', 
+          size: 1024 * 500, 
+          format: 'epub' 
+        },
+        { 
+          id: '2', 
+          title: '1984', 
+          author: 'George Orwell', 
+          description: 'A dystopian social science fiction novel and cautionary tale about totalitarianism and state surveillance.',
+          publisher: 'Secker & Warburg',
+          publishedDate: '1949',
+          language: 'en',
+          coverPath: '', 
+          status: 'queue', 
+          isReading: 0, 
+          size: 1024 * 800, 
+          format: 'epub' 
+        },
       ]);
       return;
     }
@@ -328,19 +358,6 @@ export default function App() {
                             <div className="h-full bg-[#34d399]" style={{ width: `${percentage}%` }}></div>
                           </div>
                         )}
-
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 p-3 flex flex-col gap-1 translate-y-full group-hover:translate-y-0 transition-transform" onClick={(e) => e.stopPropagation()}>
-                          {activeTab !== 'reading' && (
-                            <button onClick={() => updateBookStatus(book.id, 'reading')} className="w-full py-1 bg-[#34d399] text-black text-[10px] font-bold rounded flex items-center justify-center gap-1">
-                              <BookOpen size={12} /> Start
-                            </button>
-                          )}
-                          {activeTab !== 'archived' && (
-                            <button onClick={() => updateBookStatus(book.id, 'archived')} className="w-full py-1 bg-[#18181b] text-white text-[10px] font-bold rounded flex items-center justify-center gap-1 border border-[#27272a]">
-                              <Archive size={12} /> Archive
-                            </button>
-                          )}
-                        </div>
                       </div>
                       <div className="px-1">
                         <h3 className="text-xs font-bold truncate">{book.title}</h3>
@@ -398,7 +415,7 @@ export default function App() {
                           </button>
                         </div>
                         
-                        <div className="grid grid-cols-3 gap-4 mb-8">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                           <div className="p-4 rounded-xl bg-black/40 border border-[#27272a] text-center">
                             <p className="text-[10px] text-[#71717a] font-bold uppercase mb-1">Progress</p>
                             <p className="text-xl font-bold text-[#34d399] tracking-tighter">
@@ -412,30 +429,50 @@ export default function App() {
                             </p>
                           </div>
                           <div className="p-4 rounded-xl bg-black/40 border border-[#27272a] text-center">
-                            <p className="text-[10px] text-[#71717a] font-bold uppercase mb-1">Status</p>
-                            <p className="text-sm font-bold uppercase text-[#34d399] leading-none mt-2">
-                              {selectedBook.status}
+                            <p className="text-[10px] text-[#71717a] font-bold uppercase mb-1">Language</p>
+                            <p className="text-xl font-bold uppercase tracking-tighter">
+                              {selectedBook.language?.toUpperCase() || '-'}
+                            </p>
+                          </div>
+                          <div className="p-4 rounded-xl bg-black/40 border border-[#27272a] text-center">
+                            <p className="text-[10px] text-[#71717a] font-bold uppercase mb-1">Format</p>
+                            <p className="text-xl font-bold uppercase tracking-tighter">
+                              {selectedBook.format || '-'}
                             </p>
                           </div>
                         </div>
                         
-                        <div className="space-y-4 mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 mb-8 px-2">
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-[#71717a] font-bold uppercase tracking-widest flex items-center gap-2">
+                              <Archive size={12} /> Publisher
+                            </p>
+                            <p className="text-sm font-medium">{selectedBook.publisher || 'Unknown'}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-[#71717a] font-bold uppercase tracking-widest flex items-center gap-2">
+                              <Clock size={12} /> Published Date
+                            </p>
+                            <p className="text-sm font-medium">{selectedBook.publishedDate || 'Unknown'}</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4 mb-8 px-2">
                           <h4 className="text-xs font-bold text-[#71717a] uppercase tracking-widest flex items-center gap-2">
                              <FileText size={14} /> Description
                           </h4>
-                          <p className="text-sm leading-relaxed text-[#a1a1aa]">
-                            {selectedBook.description || "No description indexed for this ebook yet. Metadata extraction for descriptions will be added in a future update."}
+                          <p className="text-sm leading-relaxed text-[#a1a1aa] max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                            {selectedBook.description || "No description indexed for this ebook."}
                           </p>
                         </div>
-
                       </div>
                       
                       <div className="flex gap-4">
-                        <button onClick={() => updateBookStatus(selectedBook.id, 'reading')} className="flex-grow flex items-center justify-center gap-2 bg-[#34d399] text-black py-4 rounded-xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_5px_15px_-5px_rgba(52,211,153,0.4)]">
-                          <BookOpen size={18} /> Continue Reading
+                        <button className="flex-grow flex items-center justify-center gap-2 bg-[#34d399] text-black py-4 rounded-xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_5px_15px_-5px_rgba(52,211,153,0.4)]">
+                          <Download size={18} /> Download Ebook
                         </button>
-                        <button className="px-6 py-4 rounded-xl bg-[#18181b] border border-[#27272a] font-bold hover:bg-[#27272a] transition-all">
-                          <Download size={18} />
+                        <button onClick={() => setSelectedBook(null)} className="px-8 py-4 rounded-xl bg-[#18181b] border border-[#27272a] font-bold hover:bg-[#27272a] transition-all">
+                          Close
                         </button>
                       </div>
                     </div>

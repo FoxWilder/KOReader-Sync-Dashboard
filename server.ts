@@ -79,6 +79,10 @@ async function startServer() {
         title TEXT,
         author TEXT,
         description TEXT,
+        publisher TEXT,
+        publishedDate TEXT,
+        language TEXT,
+        subject TEXT,
         filePath TEXT,
         coverPath TEXT,
         status TEXT DEFAULT 'library',
@@ -141,35 +145,66 @@ async function startServer() {
           const coverTxtPath = path.join(coversDir, `${md5}.txt`);
           
           let coverPath = '';
-          if (fs.existsSync(coverTxtPath)) {
-            coverPath = `/api/covers/${md5}`;
-          } else {
-            // Try extract cover (Basic EPUB extraction)
-            try {
-              if (file.toLowerCase().endsWith('.epub')) {
-                const zip = new AdmZip(fullPath);
-                const zipEntries = zip.getEntries();
-                // Look for cover image
-                const coverEntry = zipEntries.find(e => e.entryName.toLowerCase().includes('cover') && e.entryName.match(/\.(jpg|jpeg|png)$/i));
-                if (coverEntry) {
-                   const base64 = zip.readFile(coverEntry).toString('base64');
-                   fs.writeFileSync(coverTxtPath, `data:image/jpeg;base64,${base64}`);
-                   coverPath = `/api/covers/${md5}`;
+          let ebookTitle = id;
+          let ebookAuthor = 'Unknown';
+          let ebookDesc = '';
+          let ebookPub = '';
+          let ebookDate = '';
+          let ebookLang = '';
+
+          // Extraction logic
+          try {
+            if (file.toLowerCase().endsWith('.epub')) {
+              const zip = new AdmZip(fullPath);
+              const zipEntries = zip.getEntries();
+              
+              // 1. Extract Cover
+              const coverEntry = zipEntries.find(e => e.entryName.toLowerCase().includes('cover') && e.entryName.match(/\.(jpg|jpeg|png)$/i));
+              if (coverEntry) {
+                 const base64 = zip.readFile(coverEntry).toString('base64');
+                 fs.writeFileSync(coverTxtPath, `data:image/jpeg;base64,${base64}`);
+                 coverPath = `/api/covers/${md5}`;
+              }
+
+              // 2. Extract Metadata from OPF
+              const containerEntry = zipEntries.find(e => e.entryName === 'META-INF/container.xml');
+              if (containerEntry) {
+                const containerXml = zip.readAsText(containerEntry);
+                const opfPathMatch = containerXml.match(/full-path="([^"]+)"/);
+                if (opfPathMatch) {
+                  const opfEntry = zipEntries.find(e => e.entryName === opfPathMatch[1]);
+                  if (opfEntry) {
+                    const opfXml = zip.readAsText(opfEntry);
+                    
+                    const getMeta = (tag: string) => {
+                      const match = opfXml.match(new RegExp(`<dc:${tag}[^>]*>([^<]+)</dc:${tag}>`, 'i'));
+                      return match ? match[1].trim() : '';
+                    };
+
+                    ebookTitle = getMeta('title') || ebookTitle;
+                    ebookAuthor = getMeta('creator') || ebookAuthor;
+                    ebookDesc = getMeta('description') || '';
+                    ebookPub = getMeta('publisher') || '';
+                    ebookDate = getMeta('date') || '';
+                    ebookLang = getMeta('language') || '';
+                    
+                    // Basic HTML tag removal for description
+                    ebookDesc = ebookDesc.replace(/<[^>]*>/g, '');
+                  }
                 }
               }
-            } catch (e) {
-              logToFile('service_log.txt', `Cover extraction failed for ${file}`);
             }
+          } catch (e) {
+            logToFile('service_log.txt', `Meta extraction failed for ${file}: ${e}`);
           }
 
-          const id = path.basename(file, path.extname(file));
           const exists = db.prepare('SELECT id FROM books WHERE filePath = ?').get(fullPath);
           if (!exists) {
             db.prepare(`
-              INSERT INTO books (id, title, author, filePath, coverPath, size, format, status) 
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(randomUUID(), id, 'Unknown', fullPath, coverPath, stats.size, path.extname(file).slice(1), 'library');
-            logToFile('service_log.txt', `Indexed new book: ${file}`);
+              INSERT INTO books (id, title, author, description, publisher, publishedDate, language, filePath, coverPath, size, format, status) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(randomUUID(), ebookTitle, ebookAuthor, ebookDesc, ebookPub, ebookDate, ebookLang, fullPath, coverPath, stats.size, path.extname(file).slice(1), 'library');
+            logToFile('service_log.txt', `Indexed new book: ${ebookTitle} by ${ebookAuthor}`);
           }
         }
       }
