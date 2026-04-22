@@ -24,9 +24,13 @@ async function startServer() {
 
   const app = express();
   const PORT = 3000;
-  const isProd = process.env.NODE_ENV === 'production';
+  
+  // Clean up NODE_ENV for Windows (removes trailing spaces)
+  const rawEnv = (process.env.NODE_ENV || 'development').trim().toLowerCase();
+  const isProd = rawEnv === 'production';
 
   logToFile('service_log.txt', `--- Wilder Server Starting (Mode: ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'}) ---`);
+  if (!isProd) logToFile('service_log.txt', `Note: Raw NODE_ENV was "${process.env.NODE_ENV}"`);
 
   // Start listening IMMEDIATELY to prevent parent process hangs and confirm port ownership
   app.listen(PORT, '0.0.0.0', () => {

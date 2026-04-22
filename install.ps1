@@ -124,9 +124,29 @@ if (Test-Path $setupScript) {
 Write-Log "--- Operation Successful ---" "Green"
 if ($isUpdate) { Write-Log "Note: Previous database backup saved in $backupDir" "Gray" }
 
+Write-Log "Stopping any existing Wilder processes..." "Yellow"
+# Kill processes using port 3000
+try {
+    $portProcess = Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue
+    if ($portProcess) {
+        $pids = $portProcess.OwningProcess | Select-Object -Unique
+        foreach ($p in $pids) {
+            Write-Log "Closing process $p using port 3000..."
+            Stop-Process -Id $p -Force -ErrorAction SilentlyContinue
+        }
+        Start-Sleep -Seconds 2
+    }
+} catch {}
+
+# General cleanup of node processes started by us
+Get-Process | Where-Object { $_.Name -like "*node*" -and ($_.CommandLine -like "*server.ts*" -or $_.Path -like "*$installDir*") } | Stop-Process -Force -ErrorAction SilentlyContinue
+
 Write-Log "Starting Wilder Dashboard service (Production Mode)..." "Cyan"
 $npmCmd = "npm"
 if ($IsWindows) { $npmCmd = "npm.cmd" }
+
+# Set environment variable at the session level to be safe
+$env:NODE_ENV = "production"
 
 # Use 'npm start' which forces production mode
 $process = Start-Process -FilePath $npmCmd -ArgumentList "start" -WindowStyle Hidden -PassThru -WorkingDirectory $installDir
