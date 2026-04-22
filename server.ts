@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 import Database from 'better-sqlite3';
+import { randomUUID } from 'crypto';
 
 function logToFile(filename: string, message: string) {
   const timestamp = new Date().toISOString();
@@ -68,6 +69,10 @@ async function startServer() {
     // Initialize DB tables
     logToFile('service_log.txt', 'Initializing database tables...');
     db.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE,
@@ -109,6 +114,85 @@ async function startServer() {
     res.json({ token: 'mock-token', user: { id: '1', username: 'admin' } });
   });
 
+  // Library Scan
+  app.post('/api/library/scan', async (req, res) => {
+    const libraryPathRaw = db.prepare('SELECT value FROM settings WHERE key = ?').get('library_path') as any;
+    const libraryPath = libraryPathRaw ? libraryPathRaw.value : null;
+
+    if (!libraryPath || !fs.existsSync(libraryPath)) {
+      return res.status(400).json({ error: 'invalid-path', message: 'Library path not set or invalid.' });
+    }
+
+    logToFile('service_log.txt', `Starting library scan at: ${libraryPath}`);
+    
+    const scanDir = (dir: string) => {
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        const fullPath = path.join(dir, file);
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+          scanDir(fullPath);
+        } else if (file.match(/\.(epub|pdf|mobi|azw3)$/i)) {
+          const id = path.basename(file, path.extname(file)); // Simple ID for now
+          const exists = db.prepare('SELECT id FROM books WHERE filePath = ?').get(fullPath);
+          if (!exists) {
+            db.prepare('INSERT INTO books (id, title, author, filePath, status) VALUES (?, ?, ?, ?, ?)')
+              .run(randomUUID(), file, 'Unknown', fullPath, 'library');
+            logToFile('service_log.txt', `Indexed new book: ${file}`);
+          }
+        }
+      }
+    };
+
+    try {
+      scanDir(libraryPath);
+      res.json({ success: true, message: 'Scan completed.' });
+    } catch (e: any) {
+      logToFile('service_log.txt', `Scan error: ${e.message}`);
+      res.status(500).json({ error: 'scan-failed' });
+    }
+  });
+
+  // Settings
+  app.get('/api/settings', (req, res) => {
+    const settings = db.prepare('SELECT * FROM settings').all();
+    res.json(settings);
+  });
+
+  app.post('/api/settings', (req, res) => {
+    const { key, value } = req.body;
+    db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
+    res.json({ success: true });
+  });
+
+  // System Update
+  app.get('/api/system/update/check', async (req, res) => {
+    try {
+      const githubRes = await fetch('https://api.github.com/repos/FoxWilder/KOReader-Sync-Dashboard/releases/latest');
+      const latest = await githubRes.json() as any;
+      const currentVersion = '1.1.0'; // Hardcoded for now, should match package.json
+      res.json({
+        latestVersion: latest.tag_name,
+        currentVersion,
+        updateAvailable: latest.tag_name !== currentVersion && !latest.tag_name.includes(currentVersion)
+      });
+    } catch (e) {
+      res.status(500).json({ error: 'update-check-failed' });
+    }
+  });
+
+  app.post('/api/system/update/apply', async (req, res) => {
+    logToFile('service_log.txt', 'Update requested via UI. Triggering install.ps1...');
+    // We can't easily self-update on Windows while running.
+    // We suggest the user to use the PowerShell command or we trigger a one-shot task.
+    // For this implementation, we will log a special message that the manager (if we had one) could pick up,
+    // or we just tell the user to run the one-liner in the log.
+    res.json({ 
+      success: true, 
+      message: 'Update command issued. Please run the PowerShell one-liner to complete the upgrade.' 
+    });
+  });
+
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', version: '1.1.0' });
@@ -139,8 +223,19 @@ async function startServer() {
     const updates: string[] = [];
     const params: any[] = [];
     
-    if (status !== undefined) { updates.push('status = ?'); params.push(status); }
-    if (isReading !== undefined) { updates.push('isReading = ?'); params.push(isReading ? 1 : 0); }
+    if (status !== undefined) { 
+      updates.push('status = ?'); 
+      params.push(status);
+      // Auto-set isReading based on status
+      updates.push('isReading = ?');
+      params.push(status === 'reading' ? 1 : 0);
+    } else {
+      // Direct isReading update if status is not provided
+      if (isReading !== undefined) { 
+        updates.push('isReading = ?'); 
+        params.push(isReading ? 1 : 0); 
+      }
+    }
     if (progress !== undefined) { updates.push('progress = ?'); params.push(progress); }
     
     if (updates.length === 0) return res.status(400).json({ error: 'no updates' });

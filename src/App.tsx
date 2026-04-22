@@ -50,7 +50,7 @@ interface Stats {
   uptime: number;
 }
 
-type Tab = 'library' | 'reading' | 'queue' | 'stats' | 'archived' | 'trash' | 'deployment' | 'settings';
+type Tab = 'library' | 'reading' | 'queue' | 'stats' | 'archived' | 'trash' | 'settings';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('library');
@@ -106,6 +106,10 @@ export default function App() {
   useEffect(() => {
     fetchBooks();
     if (activeTab === 'stats') fetchStats();
+    if (activeTab === 'settings') {
+      fetchSettings();
+      checkForUpdates();
+    }
   }, [activeTab]);
 
   const updateBookStatus = async (id: string, status: string) => {
@@ -130,15 +134,72 @@ export default function App() {
     { id: 'archived', label: 'Archived', icon: Archive },
     { id: 'trash', label: 'Trash', icon: Trash2 },
     { id: 'settings', label: 'Settings', icon: Settings },
-    { id: 'deployment', label: 'Deployment', icon: LayoutDashboard },
   ];
 
-  const steps = [
-    { id: '01', title: 'Repository Fork', desc: 'Sudashiii/Sake → user/Sake', status: 'done' },
-    { id: '02', title: 'Dependency Refactor', desc: 'Removing Docker & S3 Config', status: 'done' },
-    { id: '03', title: 'PowerShell Integration', desc: 'Injecting setup.ps1 & installer', status: 'active' },
-    { id: '04', title: 'CI/CD Automation', desc: 'GitHub Actions & rolling releases', status: 'pending' },
-  ];
+  const [libraryPath, setLibraryPath] = useState('');
+  const [updateInfo, setUpdateInfo] = useState<{ updateAvailable: boolean; latestVersion: string; currentVersion: string } | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const [scanning, setScanning] = useState(false);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      const data = await res.json();
+      const pathSet = data.find((s: any) => s.key === 'library_path');
+      if (pathSet) setLibraryPath(pathSet.value);
+    } catch (e) { console.error(e); }
+  };
+
+  const saveLibraryPath = async () => {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'library_path', value: libraryPath })
+    });
+    alert('Library path saved.');
+  };
+
+  const startScan = async () => {
+    setScanning(true);
+    try {
+      const res = await fetch('/api/library/scan', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        alert('Indexing complete.');
+        fetchBooks();
+      } else {
+        alert(`Indexing failed: ${data.message || 'Check logs.'}`);
+      }
+    } catch (e) { console.error(e); }
+    setScanning(false);
+  };
+
+  const checkForUpdates = async () => {
+    try {
+      const res = await fetch('/api/system/update/check');
+      const data = await res.json();
+      setUpdateInfo(data);
+    } catch (e) { console.error(e); }
+  };
+
+  const applyUpdate = async () => {
+    setUpdating(true);
+    try {
+      const res = await fetch('/api/system/update/apply', { method: 'POST' });
+      const data = await res.json();
+      alert(data.message);
+    } catch (e) { console.error(e); }
+    setUpdating(false);
+  };
+
+  useEffect(() => {
+    fetchBooks();
+    if (activeTab === 'stats') fetchStats();
+    if (activeTab === 'settings') {
+      fetchSettings();
+      checkForUpdates();
+    }
+  }, [activeTab]);
 
   return (
     <div className="flex h-screen w-full bg-[#09090b] text-[#e4e4e7] overflow-hidden font-sans">
@@ -277,159 +338,117 @@ export default function App() {
               </motion.div>
             )}
 
-            {activeTab === 'deployment' && (
+            {activeTab === 'settings' && (
               <motion.div 
-                key="deployment"
+                key="settings"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="grid grid-cols-12 gap-6"
+                className="max-w-2xl space-y-10"
               >
-                {/* Re-using the conversion dashboard logic */}
-                <div className="col-span-4 flex flex-col gap-6">
-                  <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
-                    <h2 className="text-[10px] font-bold mb-6 text-[#a1a1aa] uppercase tracking-[0.15em]">Process Tracking</h2>
-                    <div className="space-y-6">
-                      {steps.map((step) => (
-                        <div key={step.id} className="flex items-start gap-4">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border ${
-                            step.status === 'done' ? 'bg-[#34d399]/20 border-[#34d399] text-[#34d399]' :
-                            step.status === 'active' ? 'bg-[#34d399]/10 border-[#34d399] text-[#34d399] animate-pulse' :
-                            'border-[#27272a] text-[#52525b]'
-                          }`}>
-                            {step.id}
-                          </div>
+                <div>
+                  <h2 className="text-xl font-bold mb-6 flex items-center gap-3 text-[#34d399]">
+                    <Library size={20} /> Ebook Library
+                  </h2>
+                  <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6 space-y-6 shadow-xl">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-[#71717a] uppercase">Library Path (Local Windows Path)</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="C:\Users\Name\Documents\Books" 
+                            value={libraryPath}
+                            onChange={(e) => setLibraryPath(e.target.value)}
+                            className="bg-[#09090b] border border-[#27272a] p-3 rounded-lg flex-grow text-sm focus:border-[#34d399] outline-none transition-all"
+                          />
+                          <button 
+                            onClick={saveLibraryPath}
+                            className="bg-white text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-[#e4e4e7] transition-all"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-4 border-t border-[#27272a]">
+                        <button 
+                          onClick={startScan}
+                          disabled={scanning}
+                          className={`w-full flex items-center justify-center gap-3 bg-[#34d399] text-black py-3 rounded-xl text-sm font-bold hover:bg-[#34d399]/90 transition-all ${scanning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <RefreshCcw size={18} className={scanning ? 'animate-spin' : ''} />
+                          {scanning ? 'Indexing Library...' : 'Index Library Now'}
+                        </button>
+                        <p className="text-[10px] text-[#71717a] mt-3 text-center">
+                          Scans for EPUB, PDF, MOBI and AZW3 files in the library path and its subfolders.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                   <h2 className="text-xl font-bold mb-6 flex items-center gap-3 text-blue-400">
+                    <Zap size={20} /> Software Update
+                  </h2>
+                  <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6 shadow-xl">
+                    {!updateInfo ? (
+                      <button 
+                        onClick={checkForUpdates}
+                        className="w-full flex items-center justify-center gap-3 bg-[#18181b] border border-[#27272a] py-4 rounded-xl text-sm font-bold hover:border-blue-400/50 transition-all"
+                      >
+                        <RefreshCcw size={18} /> Check for Updates
+                      </button>
+                    ) : (
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium">{step.title}</p>
-                            <p className={`text-xs ${step.status === 'active' ? 'text-[#34d399]' : 'text-[#71717a]'}`}>
-                              {step.desc}
+                            <p className="text-xs font-bold text-[#71717a] uppercase mb-1">Status</p>
+                            <p className={`text-sm font-bold ${updateInfo.updateAvailable ? 'text-blue-400' : 'text-[#34d399]'}`}>
+                              {updateInfo.updateAvailable ? 'Update Available!' : 'System Up to Date'}
                             </p>
                           </div>
+                          <div className="text-right">
+                            <p className="text-xs font-bold text-[#71717a] uppercase mb-1">Current Version</p>
+                            <p className="text-sm font-mono">{updateInfo.currentVersion}</p>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
-                    <h2 className="text-[10px] font-bold mb-6 text-[#a1a1aa] uppercase tracking-[0.15em]">System Info</h2>
-                    <div className="grid grid-cols-2 gap-4 text-center mb-6">
-                      <div className="p-3 border border-[#27272a] rounded bg-black/30">
-                        <p className="text-[8px] text-[#71717a] uppercase mb-1">Backend</p>
-                        <p className="text-sm font-bold text-[#34d399]">Express</p>
-                      </div>
-                      <div className="p-3 border border-[#27272a] rounded bg-black/30">
-                        <p className="text-[8px] text-[#71717a] uppercase mb-1">Database</p>
-                        <p className="text-sm font-bold text-[#34d399]">SQLite</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="col-span-8 flex flex-col bg-[#18181b] border border-[#27272a] rounded-xl overflow-hidden shadow-2xl h-[500px]">
-                   <div className="flex items-center justify-between px-4 py-3 border-b border-[#27272a] bg-[#27272a]/20">
-                    <div className="text-[10px] font-mono text-[#71717a] uppercase tracking-[0.2em] font-bold">
-                      Automation Logs
-                    </div>
-                  </div>
-                  <div className="p-6 font-mono text-xs leading-relaxed overflow-y-auto flex-grow bg-black/40">
-                    <p className="text-[#34d399]">[INIT] Wilder Server v1.1.0 starting...</p>
-                    <p className="text-[#e4e4e7] mt-1">✓ SQLite database 'wilder.db' initialized.</p>
-                    <p className="text-[#e4e4e7]">✓ KOReader sync endpoints bound to /koreader/sync/v1/*</p>
-                    <p className="text-[#a1a1aa] mt-2 italic"># Listening for progress updates...</p>
-                    <p className="text-[#e4e4e7] mt-4">&gt; Version: rolling-2bdeb34</p>
-                    <p className="text-[#e4e4e7]">&gt; Server: listening on 0.0.0.0:3000</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {activeTab === 'settings' && (
-              <motion.div 
-                key="settings"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="max-w-xl space-y-10"
-              >
-                <div>
-                  <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
-                    <RefreshCcw size={20} className="text-[#34d399]" /> KOReader Sync Configuration
-                  </h2>
-                  <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6 space-y-6">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-[#71717a] uppercase">Server URL</label>
-                      <div className="bg-[#09090b] border border-[#27272a] p-3 rounded-lg flex items-center justify-between">
-                        <code className="text-sm font-mono text-[#34d399]">http://your-server-ip:3000/koreader/sync/v1</code>
-                        <button className="text-[10px] font-bold text-[#71717a] hover:text-white uppercase transition-colors">Copy</button>
+                        {updateInfo.updateAvailable && (
+                          <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl space-y-4">
+                            <p className="text-xs">
+                              A new release <span className="font-bold text-blue-400">{updateInfo.latestVersion}</span> is available. 
+                              Applying the update will restart the server.
+                            </p>
+                            <button 
+                              onClick={applyUpdate}
+                              disabled={updating}
+                              className={`w-full flex items-center justify-center gap-3 bg-blue-500 text-white py-3 rounded-xl text-sm font-bold hover:bg-blue-600 transition-all ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              <Download size={18} />
+                              {updating ? 'Applying Update...' : 'Apply Update Now'}
+                            </button>
+                          </div>
+                        )}
+                        
+                        {!updateInfo.updateAvailable && (
+                          <p className="text-xs text-[#71717a] text-center">
+                            You are running the latest version of Wilder Sync.
+                          </p>
+                        )}
                       </div>
-                      <p className="text-[10px] text-[#52525b]">Enter this URL in your KOReader plugin settings to enable progress syncing.</p>
-                    </div>
-
-                    <div className="space-y-2">
-                       <label className="text-xs font-bold text-[#71717a] uppercase">Auth Token</label>
-                       <div className="bg-[#09090b] border border-[#27272a] p-3 rounded-lg flex items-center justify-between">
-                        <code className="text-sm font-mono text-[#34d399]">sk_live_51P...mock_token</code>
-                        <button className="text-[10px] font-bold text-[#71717a] hover:text-white uppercase transition-colors">Copy</button>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
                 <div>
-                   <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
-                    <Download size={20} className="text-[#34d399]" /> Maintenance
+                   <h2 className="text-xl font-bold mb-6 flex items-center gap-3 text-red-500">
+                    <History size={20} /> System Maintenance
                   </h2>
                   <div className="flex gap-4">
-                    <button className="flex-grow flex items-center justify-center gap-3 bg-[#18181b] border border-[#27272a] py-4 rounded-xl text-sm font-bold hover:border-[#34d399]/50 transition-all">
-                       <RefreshCcw size={18} /> Forced Sync
-                    </button>
-                    <button className="flex-grow flex items-center justify-center gap-3 bg-red-500/10 border border-red-500/50 py-4 rounded-xl text-sm font-bold text-red-500 hover:bg-red-500/20 transition-all">
-                       <Trash2 size={18} /> Clear Database
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {activeTab === 'settings' && (
-              <motion.div 
-                key="settings"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="max-w-xl space-y-10"
-              >
-                <div>
-                  <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
-                    <RefreshCcw size={20} className="text-[#34d399]" /> KOReader Sync Configuration
-                  </h2>
-                  <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6 space-y-6">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-[#71717a] uppercase">Server URL</label>
-                      <div className="bg-[#09090b] border border-[#27272a] p-3 rounded-lg flex items-center justify-between">
-                        <code className="text-sm font-mono text-[#34d399]">http://your-server-ip:3000/koreader/sync/v1</code>
-                        <button className="text-[10px] font-bold text-[#71717a] hover:text-white uppercase transition-colors">Copy</button>
-                      </div>
-                      <p className="text-[10px] text-[#52525b]">Enter this URL in your KOReader plugin settings to enable progress syncing.</p>
-                    </div>
-
-                    <div className="space-y-2">
-                       <label className="text-xs font-bold text-[#71717a] uppercase">Auth Token</label>
-                       <div className="bg-[#09090b] border border-[#27272a] p-3 rounded-lg flex items-center justify-between">
-                        <code className="text-sm font-mono text-[#34d399]">sk_live_51P...mock_token</code>
-                        <button className="text-[10px] font-bold text-[#71717a] hover:text-white uppercase transition-colors">Copy</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                   <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
-                    <Download size={20} className="text-[#34d399]" /> Maintenance
-                  </h2>
-                  <div className="flex gap-4">
-                    <button className="flex-grow flex items-center justify-center gap-3 bg-[#18181b] border border-[#27272a] py-4 rounded-xl text-sm font-bold hover:border-[#34d399]/50 transition-all">
-                       <RefreshCcw size={18} /> Forced Sync
+                    <button className="flex-grow flex items-center justify-center gap-3 bg-[#18181b] border border-[#27272a] py-4 rounded-xl text-sm font-bold hover:border-white/20 transition-all">
+                       <RefreshCcw size={18} /> Forced Handshake
                     </button>
                     <button className="flex-grow flex items-center justify-center gap-3 bg-red-500/10 border border-red-500/50 py-4 rounded-xl text-sm font-bold text-red-500 hover:bg-red-500/20 transition-all">
                        <Trash2 size={18} /> Clear Database
