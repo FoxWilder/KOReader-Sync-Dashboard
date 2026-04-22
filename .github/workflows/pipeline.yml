@@ -10,6 +10,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  packages: write
 
 jobs:
   build-and-release:
@@ -17,11 +18,15 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed for deep meaningful release notes
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          # Fix: We now have package-lock.json, so cache should work. 
+          # But for the very first run in the real repo, we might need to be careful.
           cache: 'npm'
 
       - name: Install Dependencies
@@ -29,27 +34,43 @@ jobs:
 
       - name: Build Application
         run: npm run build
-        continue-on-error: true # In case build script is not standard yet
+        continue-on-error: true
+
+      - name: Set Release Version
+        id: vars
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=rolling-$(date +'%Y%m%d')-${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Prepare Release ZIP
         run: |
           mkdir -p release
-          # Include necessary runtime files
-          cp -r package.json setup.ps1 migrate.py check_environment.py release/
-          # Include build output (adjust 'build' or 'dist' based on framework)
+          cp -r package.json package-lock.json setup.ps1 migrate.py check_environment.py release/
           [ -d build ] && cp -r build release/ || true
           [ -d dist ] && cp -r dist release/ || true
           [ -d .svelte-kit ] && cp -r .svelte-kit release/ || true
-          zip -r sake-release.zip release/
+          cd release && zip -r ../koreader-sync-dashboard-${{ steps.vars.outputs.tag }}.zip .
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: sake-release.zip
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: Release ${{ steps.vars.outputs.tag }}
+          files: koreader-sync-dashboard-${{ steps.vars.outputs.tag }}.zip
           draft: false
-          prerelease: false
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
           generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to GitHub Packages
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > ~/.npmrc
+          npm publish || echo "Package already exists or version not bumped"
+        continue-on-error: true
 
       - name: Setup Pages
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
@@ -59,7 +80,7 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'docs' # User can place a landing page in docs/
+          path: 'docs'
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'

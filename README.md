@@ -2,15 +2,22 @@
 
 A polished, **Docker-free** fork of [Sudashiii/Sake](https://github.com/Sudashiii/Sake) optimized for Windows Server 2025. This project provides a clean web library, KOReader progress syncing, and book provider imports without the complexity of Docker.
 
-## 🚀 One-Line Installation / Upgrade
+## 🚀 One-Line Installation / Upgrade / Uninstall
 
-Run the following command in PowerShell in the folder where you want to install or upgrade the dashboard:
+Run the following command in PowerShell in the folder where you want to manage the dashboard:
 
 ```powershell
+# Standard Install / Upgrade (Latest Release)
 iwr -useb https://raw.githubusercontent.com/FoxWilder/KOReader-Sync-Dashboard/main/install.ps1 | iex
+
+# Install Significant Version (Rollback/Forward)
+$v = "v1.0.0"; iwr -useb https://raw.githubusercontent.com/FoxWilder/KOReader-Sync-Dashboard/main/install.ps1 | iex -Arguments "-Version $v"
+
+# Uninstall and Cleanup (Deletes files and database)
+iwr -useb https://raw.githubusercontent.com/FoxWilder/KOReader-Sync-Dashboard/main/install.ps1 | iex -Arguments "-Uninstall"
 ```
 
-*This script automatically detects existing installations and performs an upgrade while preserving your `sake.db` and `.env` settings.*
+*The setup automatically handles data migration and backups during upgrades, and allows complete cleanup via the `-Uninstall` flag.*
 
 ## ✨ Features
 

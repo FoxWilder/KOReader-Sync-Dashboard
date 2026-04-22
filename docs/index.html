@@ -3,41 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KOReader Sync Dashboard - Preview</title>
+    <title>KOReader Sync Dashboard | Your Personal Reading Library</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 2rem; }
-        h1 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 1rem; }
-        .badge { display: inline-block; padding: 4px 8px; background: #e1f5fe; color: #01579b; border-radius: 4px; font-size: 0.9rem; margin-bottom: 1rem; }
-        .hero { background: #f8f9fa; padding: 2rem; border-radius: 8px; border-left: 5px solid #007bff; margin: 2rem 0; }
-        pre { background: #272822; color: #f8f8f2; padding: 1rem; border-radius: 4px; overflow-x: auto; }
-        .btn { display: inline-block; background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; margin-top: 1rem; }
-        .btn:hover { background: #0056b3; }
+        body { background-color: #09090b; color: #e4e4e7; font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(24, 24, 27, 0.8); backdrop-filter: blur(12px); border: 1px solid #27272a; }
     </style>
 </head>
-<body>
-    <h1>📚 KOReader Sync Dashboard</h1>
-    <div class="badge">Windows Server 2025 Ready</div>
-    <div class="badge">Docker-Free</div>
+<body class="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+    <div class="max-w-4xl w-full glass rounded-3xl p-12 shadow-2xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-[100px]"></div>
+        
+        <div class="w-20 h-20 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#09090b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M8 7h6"/><path d="M8 11h8"/></svg>
+        </div>
 
-    <div class="hero">
-        <h2>Modern Reading Stack, Simplified.</h2>
-        <p>This is a web preview of the <strong>KOReader Sync Dashboard</strong> project. It provides an automated, native installation experience for the Sake ecosystem without the overhead of Docker.</p>
-        <a href="https://github.com/FoxWilder/KOReader-Sync-Dashboard" class="btn">View on GitHub</a>
+        <h1 class="text-5xl font-extrabold tracking-tight mb-4 text-white">Sake <span class="text-emerald-400">Sync</span></h1>
+        <p class="text-xl text-zinc-400 mb-10 max-w-2xl mx-auto">
+            A self-hosted reading stack and KOReader synchronization server. 
+            Docker-free, lightweight, and automated for Windows Server 2025.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 text-left">
+            <div class="p-6 bg-black/40 rounded-2xl border border-zinc-800">
+                <h3 class="font-bold text-emerald-400 mb-2">Ebook Library</h3>
+                <p class="text-sm text-zinc-500 ">Browse your EPUB collection with a premium, centralized dashboard.</p>
+            </div>
+            <div class="p-6 bg-black/40 rounded-2xl border border-zinc-800">
+                <h3 class="font-bold text-emerald-400 mb-2">Progress Sync</h3>
+                <p class="text-sm text-zinc-500 ">Seamlessly sync reading positions across all your devices using KOReader.</p>
+            </div>
+            <div class="p-6 bg-black/40 rounded-2xl border border-zinc-800">
+                <h3 class="font-bold text-emerald-400 mb-2">No Docker</h3>
+                <p class="text-sm text-zinc-500 ">Native PowerShell installers for direct deployment on Windows.</p>
+            </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="https://github.com/FoxWilder/KOReader-Sync-Dashboard" class="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-all">View on GitHub</a>
+            <code class="px-8 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-emerald-400 font-mono text-sm">iwr -useb ... | iex</code>
+        </div>
     </div>
-
-    <h3>Installation</h3>
-    <p>Run this command in PowerShell to install or upgrade:</p>
-    <pre>iwr -useb https://raw.githubusercontent.com/FoxWilder/KOReader-Sync-Dashboard/main/install.ps1 | iex</pre>
-
-    <h3>Why this fork?</h3>
-    <ul>
-        <li><strong>Native Performance</strong>: Direct runtime execution on Windows Server.</li>
-        <li><strong>Automated Lifecycle</strong>: Built-in GitHub Action pipelines for releases and previews.</li>
-        <li><strong>Zero Config</strong>: Switches to local SQLite and filesystem storage automatically.</li>
-    </ul>
-
-    <footer>
-        <p>&copy; 2026 FoxWilder. Based on Sudashiii/Sake.</p>
+    
+    <footer class="mt-12 text-zinc-600 text-sm">
+        Built with Sake • Automated by GitHub Actions
     </footer>
 </body>
 </html>
