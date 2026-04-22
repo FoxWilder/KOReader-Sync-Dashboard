@@ -25,12 +25,12 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
   
-  // Clean up NODE_ENV for Windows (removes trailing spaces)
+  const isProdFlag = process.argv.includes('--prod');
   const rawEnv = (process.env.NODE_ENV || 'development').trim().toLowerCase();
-  const isProd = rawEnv === 'production';
+  const isProd = isProdFlag || rawEnv === 'production';
 
   logToFile('service_log.txt', `--- Wilder Server Starting (Mode: ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'}) ---`);
-  if (!isProd) logToFile('service_log.txt', `Note: Raw NODE_ENV was "${process.env.NODE_ENV}"`);
+  if (!isProd) logToFile('service_log.txt', `Note: Raw NODE_ENV was "${process.env.NODE_ENV}", isProdFlag was ${isProdFlag}`);
 
   // Start listening IMMEDIATELY to prevent parent process hangs and confirm port ownership
   app.listen(PORT, '0.0.0.0', () => {
@@ -189,7 +189,7 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isProd) {
     logToFile('service_log.txt', 'Initializing Vite middleware...');
     try {
       const vite = await createViteServer({

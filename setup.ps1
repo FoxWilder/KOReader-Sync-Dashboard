@@ -59,5 +59,6 @@ if ($LASTEXITCODE -ne 0) {
 
 # 5. Done
 Write-Host "--- Setup Complete ---" -ForegroundColor Green
-Write-Host "To start the application, run: npm run dev"
+Write-Host "To start the application in Production Mode, run: npm start"
+Write-Host "To start in Development Mode, run: npm run dev"
 Write-Host "Your library will be available at http://localhost:3000 (default)"

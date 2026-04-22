@@ -145,11 +145,13 @@ Write-Log "Starting Wilder Dashboard service (Production Mode)..." "Cyan"
 $npmCmd = "npm"
 if ($IsWindows) { $npmCmd = "npm.cmd" }
 
-# Set environment variable at the session level to be safe
-$env:NODE_ENV = "production"
+# Set environment variables for the background process
+$envVars = @{
+    "NODE_ENV" = "production"
+}
 
-# Use 'npm start' which forces production mode
-$process = Start-Process -FilePath $npmCmd -ArgumentList "start" -WindowStyle Hidden -PassThru -WorkingDirectory $installDir
+# Use 'npm start' which forces production mode via --prod flag
+$process = Start-Process -FilePath $npmCmd -ArgumentList "start" -WindowStyle Hidden -PassThru -WorkingDirectory $installDir -Environment $envVars
 
 if ($process) {
     Write-Log "Dashboard is starting (PID: $($process.Id))." "Green"
