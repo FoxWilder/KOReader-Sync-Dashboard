@@ -8,12 +8,26 @@ import Database from 'better-sqlite3';
 function logToFile(filename: string, message: string) {
   const timestamp = new Date().toISOString();
   const logEntry = `[${timestamp}] ${message}\n`;
-  fs.appendFileSync(path.join(process.cwd(), filename), logEntry);
+  try {
+    fs.appendFileSync(path.join(process.cwd(), filename), logEntry);
+  } catch (e) {
+    console.error(`Failed to write to ${filename}:`, e);
+  }
 }
 
 async function startServer() {
+  // Ensure log files exist for tailing
+  ['service_log.txt', 'sync_log.txt'].forEach(f => {
+    const p = path.join(process.cwd(), f);
+    if (!fs.existsSync(p)) fs.writeFileSync(p, '');
+  });
+
+  logToFile('service_log.txt', '--- Wilder Server Starting ---');
+  
   const app = express();
   const PORT = 3000;
+  
+  logToFile('service_log.txt', `Attempting to initialize database at ${path.join(process.cwd(), 'wilder.db')}...`);
   const db = new Database('wilder.db');
 
   // service_log.txt for general web requests

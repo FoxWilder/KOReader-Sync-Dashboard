@@ -3,50 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KOReader Sync Dashboard | Your Personal Reading Library</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Wilder Sync Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
-        body { background-color: #09090b; color: #e4e4e7; font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(24, 24, 27, 0.8); backdrop-filter: blur(12px); border: 1px solid #27272a; }
+        body { background-color: #09090b; color: #e4e4e7; font-family: 'Inter', system-ui, sans-serif; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-    <div class="max-w-4xl w-full glass rounded-3xl p-12 shadow-2xl relative overflow-hidden">
-        <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-[100px]"></div>
-        
-        <div class="w-20 h-20 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#09090b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M8 7h6"/><path d="M8 11h8"/></svg>
-        </div>
-
-        <h1 class="text-5xl font-extrabold tracking-tight mb-4 text-white">Wilder <span class="text-emerald-400">Sync</span></h1>
-        <p class="text-xl text-zinc-400 mb-10 max-w-2xl mx-auto">
-            A self-hosted reading stack and KOReader synchronization server. 
-            Docker-free, lightweight, and automated for Windows Server 2025.
-        </p>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 text-left">
-            <div class="p-6 bg-black/40 rounded-2xl border border-zinc-800">
-                <h3 class="font-bold text-emerald-400 mb-2">Ebook Library</h3>
-                <p class="text-sm text-zinc-500 ">Browse your EPUB collection with a premium, centralized dashboard.</p>
-            </div>
-            <div class="p-6 bg-black/40 rounded-2xl border border-zinc-800">
-                <h3 class="font-bold text-emerald-400 mb-2">Progress Sync</h3>
-                <p class="text-sm text-zinc-500 ">Seamlessly sync reading positions across all your devices using KOReader.</p>
-            </div>
-            <div class="p-6 bg-black/40 rounded-2xl border border-zinc-800">
-                <h3 class="font-bold text-emerald-400 mb-2">No Docker</h3>
-                <p class="text-sm text-zinc-500 ">Native PowerShell installers for direct deployment on Windows.</p>
+<body class="min-h-screen flex flex-col items-center justify-center p-8">
+    <div class="max-w-4xl w-full text-center space-y-12">
+        <!-- Logo -->
+        <div class="flex justify-center">
+            <div class="w-16 h-16 bg-[#34d399] rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(52,211,153,0.3)]">
+                <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#09090b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M8 7h6"/><path d="M8 11h8"/></svg>
             </div>
         </div>
 
-        <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="https://github.com/FoxWilder/KOReader-Sync-Dashboard" class="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-all">View on GitHub</a>
-            <code class="px-8 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-emerald-400 font-mono text-sm">iwr -useb ... | iex</code>
+        <div class="space-y-4">
+            <h1 class="text-6xl font-black tracking-tighter text-white underline decoration-[#34d399]/30 uppercase">WILDER <span class="text-[#34d399]">SYNC</span></h1>
+            <p class="text-xl text-zinc-400 max-w-2xl mx-auto font-medium leading-relaxed">
+                The ultimate **Docker-free** self-hosted synchronization stack for KOReader. 
+                Optimized for Windows Server 2025.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+            <div class="p-8 bg-[#18181b] rounded-3xl border border-[#27272a] hover:border-[#34d399]/50 transition-all group">
+                <div class="w-10 h-10 bg-[#34d399]/10 rounded-lg flex items-center justify-center mb-6 text-[#34d399]">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                </div>
+                <h3 class="text-xl font-bold mb-3 text-white">Full Library & Sync</h3>
+                <p class="text-zinc-500 leading-relaxed">Visual dashboard for your collection + native KOReader protocol. Sync positions, highlights, and history across all devices.</p>
+            </div>
+            
+            <div class="p-8 bg-[#18181b] rounded-3xl border border-[#27272a] hover:border-[#34d399]/50 transition-all">
+                <div class="w-10 h-10 bg-[#34d399]/10 rounded-lg flex items-center justify-center mb-6 text-[#34d399]">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </div>
+                <h3 class="text-xl font-bold mb-3 text-white">Direct Windows Install</h3>
+                <p class="text-zinc-500 leading-relaxed">One-line PowerShell installer. No Docker, no WSL, no complexity. Deploys a portable service in the current directory.</p>
+            </div>
+        </div>
+
+        <div class="pt-8">
+            <div class="inline-flex flex-col items-center gap-4">
+                <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-xl font-mono text-sm text-[#34d399] select-all cursor-pointer">
+                    iwr -useb https://raw.githubusercontent.com/FoxWilder/KOReader-Sync-Dashboard/main/install.ps1 | iex
+                </div>
+                <p class="text-xs text-zinc-500 uppercase tracking-widest font-bold">Based on project Sake by Sudashiii</p>
+            </div>
         </div>
     </div>
-    
-    <footer class="mt-12 text-zinc-600 text-sm">
-        Built with Sake • Automated by GitHub Actions
-    </footer>
 </body>
 </html>

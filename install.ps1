@@ -126,7 +126,26 @@ Write-Log "Starting Wilder Dashboard service..." "Cyan"
 $npmCmd = "npm"
 if ($IsWindows) { $npmCmd = "npm.cmd" }
 
-Start-Process -FilePath $npmCmd -ArgumentList "run dev" -WindowStyle Hidden -WorkingDirectory $installDir
+$process = Start-Process -FilePath $npmCmd -ArgumentList "run dev" -WindowStyle Hidden -PassThru -WorkingDirectory $installDir
 
-Write-Log "Dashboard is active. It will run in the background."
-Write-Log "Portable service started at http://localhost:3000"
+if ($process) {
+    Write-Log "Dashboard is starting in the background (PID: $($process.Id))." "Green"
+    Write-Log "Service logs will appear below. Press Ctrl+C to close this manager window." "Yellow"
+    Write-Log "(The service will continue running even if you close this window)" "Gray"
+    
+    # Wait for logs to be initialized by the server (max 10s)
+    $retry = 0
+    while (-not (Test-Path "service_log.txt") -and $retry -lt 10) {
+        Start-Sleep -Seconds 1
+        $retry++
+    }
+    
+    if (Test-Path "service_log.txt") {
+        Get-Content -Path "service_log.txt" -Wait -Tail 20
+    } else {
+        Write-Log "CRITICAL: Service failed to initialize log files. The process may have crashed." "Red"
+        Write-Log "Check the terminal for immediate errors."
+    }
+} else {
+    Write-Log "ERROR: Failed to start the dashboard process." "Red"
+}

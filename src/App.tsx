@@ -71,7 +71,7 @@ export default function App() {
         { id: '1', title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1490528560i/4671.jpg', status: 'reading', isReading: 1 },
         { id: '2', title: '1984', author: 'George Orwell', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1532714506i/40961427.jpg', status: 'queue', isReading: 0 },
         { id: '3', title: 'Crime and Punishment', author: 'Fyodor Dostoevsky', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1382846449i/7144.jpg', status: 'archived', isReading: 0 },
-        { id: '4', title: 'Brave New World', author: 'Aldous Huxley', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1546971276i/435039.jpg', status: 'library', isReading: 0 },
+        { id: '4', title: 'Brave New World', author: 'Aldous Huxley', coverPath: 'https://m.media-amazon.com/images/I/91D4Y9W9uyL._AC_UF1000,1000_QL80_.jpg', status: 'library', isReading: 0 },
         { id: '5', title: 'The Hobbit', author: 'J.R.R. Tolkien', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1372847500i/5907.jpg', status: 'reading', isReading: 1 },
         { id: '6', title: 'Fahrenheit 451', author: 'Ray Bradbury', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1383718290i/13079982.jpg', status: 'queue', isReading: 0 },
       ]);

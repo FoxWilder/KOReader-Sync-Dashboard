@@ -14,7 +14,7 @@
     "dev": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "db:push": "drizzle-kit push",
+    "db:push": "drizzle-kit push --config=drizzle.config.ts",
     "start": "node dist/server.js",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
