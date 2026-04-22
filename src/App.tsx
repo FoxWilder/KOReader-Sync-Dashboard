@@ -37,10 +37,14 @@ interface Book {
   id: string;
   title: string;
   author: string;
+  description?: string;
   coverPath: string;
-  status: 'queue' | 'reading' | 'archived' | 'trash';
+  status: 'library' | 'reading' | 'queue' | 'archived' | 'trash';
   isReading: number;
   progress?: string;
+  size?: number;
+  pages?: number;
+  format?: string;
 }
 
 interface Stats {
@@ -57,6 +61,8 @@ export default function App() {
   const [books, setBooks] = useState<Book[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [covers, setCovers] = useState<Record<string, string>>({});
 
   // Detect if we are in a preview environment (AI Studio or GitHub Pages)
   const isPreview = typeof window !== 'undefined' && (
@@ -68,12 +74,8 @@ export default function App() {
   const fetchBooks = async () => {
     if (isPreview) {
       setBooks([
-        { id: '1', title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1490528560i/4671.jpg', status: 'reading', isReading: 1 },
-        { id: '2', title: '1984', author: 'George Orwell', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1532714506i/40961427.jpg', status: 'queue', isReading: 0 },
-        { id: '3', title: 'Crime and Punishment', author: 'Fyodor Dostoevsky', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1382846449i/7144.jpg', status: 'archived', isReading: 0 },
-        { id: '4', title: 'Brave New World', author: 'Aldous Huxley', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1523058850i/375013.jpg', status: 'library', isReading: 0 },
-        { id: '5', title: 'The Hobbit', author: 'J.R.R. Tolkien', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1372847500i/5907.jpg', status: 'reading', isReading: 1 },
-        { id: '6', title: 'Fahrenheit 451', author: 'Ray Bradbury', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1383718290i/13079982.jpg', status: 'queue', isReading: 0 },
+        { id: '1', title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', coverPath: '', status: 'reading', isReading: 1, progress: '{"percentage": 45}', size: 1024 * 500, format: 'epub' },
+        { id: '2', title: '1984', author: 'George Orwell', coverPath: '', status: 'queue', isReading: 0, size: 1024 * 800, format: 'epub' },
       ]);
       return;
     }
@@ -83,6 +85,17 @@ export default function App() {
       const res = await fetch(`/api/books${statusParam}`);
       const data = await res.json();
       setBooks(data);
+      
+      // Fetch covers for books that have a coverPath
+      data.forEach(async (book: Book) => {
+        if (book.coverPath && !covers[book.id]) {
+          try {
+            const cres = await fetch(book.coverPath);
+            const b64 = await cres.text();
+            setCovers(prev => ({ ...prev, [book.id]: b64 }));
+          } catch (e) { console.error(e); }
+        }
+      });
     } catch (e) {
       console.error(e);
     }
@@ -201,6 +214,18 @@ export default function App() {
     }
   }, [activeTab]);
 
+  const parseProgress = (progStr?: string) => {
+    if (!progStr) return null;
+    try {
+      return JSON.parse(progStr);
+    } catch (e) { return null; }
+  };
+
+  const getSyncUrl = () => {
+    const host = window.location.host;
+    return `http://${host}/sync`;
+  };
+
   return (
     <div className="flex h-screen w-full bg-[#09090b] text-[#e4e4e7] overflow-hidden font-sans">
       {/* Sidebar */}
@@ -276,40 +301,148 @@ export default function App() {
                 exit={{ opacity: 0, y: -10 }}
                 className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-6"
               >
-                {filteredBooks.map((book) => (
-                  <motion.div 
-                    key={book.id}
-                    whileHover={{ scale: 1.05 }}
-                    className="group flex flex-col gap-3"
-                  >
-                    <div className="aspect-[2/3] bg-[#18181b] rounded-lg overflow-hidden border border-[#27272a] relative group-hover:border-[#34d399]/50 transition-all shadow-xl">
-                      <img src={book.coverPath} alt={book.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 p-3 flex flex-col gap-1 translate-y-full group-hover:translate-y-0 transition-transform">
-                        {activeTab !== 'reading' && (
-                          <button onClick={() => updateBookStatus(book.id, 'reading')} className="w-full py-1 bg-[#34d399] text-black text-[10px] font-bold rounded flex items-center justify-center gap-1">
-                            <BookOpen size={12} /> Start
-                          </button>
+                {filteredBooks.map((book) => {
+                  const progress = parseProgress(book.progress);
+                  const percentage = progress?.percentage || 0;
+                  
+                  return (
+                    <motion.div 
+                      key={book.id}
+                      whileHover={{ scale: 1.05 }}
+                      onClick={() => setSelectedBook(book)}
+                      className="group flex flex-col gap-3 cursor-pointer"
+                    >
+                      <div className="aspect-[2/3] bg-[#18181b] rounded-lg overflow-hidden border border-[#27272a] relative group-hover:border-[#34d399]/50 transition-all shadow-xl">
+                        {covers[book.id] ? (
+                          <img src={covers[book.id]} alt={book.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center gap-2">
+                            <BookOpen size={24} className="text-[#34d399]/30" />
+                            <p className="text-[10px] text-[#52525b] font-bold uppercase tracking-widest">No Cover</p>
+                          </div>
                         )}
-                        {activeTab !== 'archived' && (
-                          <button onClick={() => updateBookStatus(book.id, 'archived')} className="w-full py-1 bg-[#18181b] text-white text-[10px] font-bold rounded flex items-center justify-center gap-1 border border-[#27272a]">
-                            <Archive size={12} /> Archive
-                          </button>
+                        
+                        {/* Progress Bar overlay */}
+                        {percentage > 0 && (
+                          <div className="absolute top-0 left-0 w-full h-1 bg-[#27272a]">
+                            <div className="h-full bg-[#34d399]" style={{ width: `${percentage}%` }}></div>
+                          </div>
                         )}
-                        {activeTab !== 'trash' && (
-                           <button onClick={() => updateBookStatus(book.id, 'trash')} className="w-full py-1 bg-red-500/20 text-red-500 text-[10px] font-bold rounded flex items-center justify-center gap-1 border border-red-500/30">
-                            <Trash2 size={12} /> Trash
-                          </button>
-                        )}
+
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 p-3 flex flex-col gap-1 translate-y-full group-hover:translate-y-0 transition-transform" onClick={(e) => e.stopPropagation()}>
+                          {activeTab !== 'reading' && (
+                            <button onClick={() => updateBookStatus(book.id, 'reading')} className="w-full py-1 bg-[#34d399] text-black text-[10px] font-bold rounded flex items-center justify-center gap-1">
+                              <BookOpen size={12} /> Start
+                            </button>
+                          )}
+                          {activeTab !== 'archived' && (
+                            <button onClick={() => updateBookStatus(book.id, 'archived')} className="w-full py-1 bg-[#18181b] text-white text-[10px] font-bold rounded flex items-center justify-center gap-1 border border-[#27272a]">
+                              <Archive size={12} /> Archive
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-bold truncate">{book.title}</h3>
-                      <p className="text-[10px] text-[#71717a] truncate">{book.author}</p>
-                    </div>
-                  </motion.div>
-                ))}
+                      <div className="px-1">
+                        <h3 className="text-xs font-bold truncate">{book.title}</h3>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <p className="text-[10px] text-[#71717a] truncate max-w-[70%]">{book.author}</p>
+                          {percentage > 0 && <span className="text-[8px] font-bold text-[#34d399]">{Math.round(percentage)}%</span>}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </motion.div>
             )}
+
+            {/* Detail Modal */}
+            <AnimatePresence>
+              {selectedBook && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setSelectedBook(null)}
+                  className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm"
+                >
+                  <motion.div 
+                    initial={{ scale: 0.9, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.9, y: 20 }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-[#18181b] border border-[#27272a] rounded-2xl overflow-hidden max-w-4xl w-full flex flex-col md:flex-row h-[90vh] md:h-auto shadow-2xl"
+                  >
+                    <div className="w-full md:w-1/3 aspect-[2/3] md:aspect-auto bg-black flex items-center justify-center relative">
+                      {covers[selectedBook.id] ? (
+                        <img src={covers[selectedBook.id]} alt={selectedBook.title} className="w-full h-full object-cover opacity-90" />
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 opacity-20">
+                          <BookOpen size={64} />
+                          <p className="text-sm font-bold uppercase tracking-widest">No Cover</p>
+                        </div>
+                      )}
+                      <div className="absolute top-4 left-4 bg-black/60 backdrop-blur px-3 py-1 rounded-full border border-white/10 text-[10px] font-bold">
+                        {selectedBook.format?.toUpperCase() || 'EBOOK'}
+                      </div>
+                    </div>
+                    
+                    <div className="flex-grow p-8 flex flex-col justify-between overflow-y-auto">
+                      <div>
+                        <div className="flex items-start justify-between mb-6">
+                          <div>
+                            <h2 className="text-3xl font-bold tracking-tight mb-2 leading-tight">{selectedBook.title}</h2>
+                            <p className="text-lg text-[#a1a1aa] font-medium italic">by {selectedBook.author}</p>
+                          </div>
+                          <button onClick={() => setSelectedBook(null)} className="text-[#a1a1aa] hover:text-white transition-colors">
+                            <Plus size={24} className="rotate-45" />
+                          </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-4 mb-8">
+                          <div className="p-4 rounded-xl bg-black/40 border border-[#27272a] text-center">
+                            <p className="text-[10px] text-[#71717a] font-bold uppercase mb-1">Progress</p>
+                            <p className="text-xl font-bold text-[#34d399] tracking-tighter">
+                              {Math.round(parseProgress(selectedBook.progress)?.percentage || 0)}%
+                            </p>
+                          </div>
+                          <div className="p-4 rounded-xl bg-black/40 border border-[#27272a] text-center">
+                            <p className="text-[10px] text-[#71717a] font-bold uppercase mb-1">Size</p>
+                            <p className="text-xl font-bold tracking-tighter">
+                              {selectedBook.size ? (selectedBook.size / (1024 * 1024)).toFixed(1) : '?'} MB
+                            </p>
+                          </div>
+                          <div className="p-4 rounded-xl bg-black/40 border border-[#27272a] text-center">
+                            <p className="text-[10px] text-[#71717a] font-bold uppercase mb-1">Status</p>
+                            <p className="text-sm font-bold uppercase text-[#34d399] leading-none mt-2">
+                              {selectedBook.status}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-4 mb-8">
+                          <h4 className="text-xs font-bold text-[#71717a] uppercase tracking-widest flex items-center gap-2">
+                             <FileText size={14} /> Description
+                          </h4>
+                          <p className="text-sm leading-relaxed text-[#a1a1aa]">
+                            {selectedBook.description || "No description indexed for this ebook yet. Metadata extraction for descriptions will be added in a future update."}
+                          </p>
+                        </div>
+
+                      </div>
+                      
+                      <div className="flex gap-4">
+                        <button onClick={() => updateBookStatus(selectedBook.id, 'reading')} className="flex-grow flex items-center justify-center gap-2 bg-[#34d399] text-black py-4 rounded-xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_5px_15px_-5px_rgba(52,211,153,0.4)]">
+                          <BookOpen size={18} /> Continue Reading
+                        </button>
+                        <button className="px-6 py-4 rounded-xl bg-[#18181b] border border-[#27272a] font-bold hover:bg-[#27272a] transition-all">
+                          <Download size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {activeTab === 'stats' && (
               <motion.div 
@@ -346,6 +479,38 @@ export default function App() {
                 exit={{ opacity: 0, y: -10 }}
                 className="max-w-2xl space-y-10"
               >
+                <div>
+                  <h2 className="text-xl font-bold mb-6 flex items-center gap-3 text-orange-400">
+                    <RefreshCcw size={20} /> KOReader Sync Configuration
+                  </h2>
+                  <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6 space-y-6 shadow-xl">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-[#71717a] uppercase tracking-widest">Configuration URL</label>
+                      <div className="bg-[#09090b] border border-[#27272a] p-4 rounded-xl flex items-center justify-between group">
+                        <code className="text-sm font-mono text-[#34d399]">{getSyncUrl()}</code>
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(getSyncUrl());
+                            alert('Sync URL copied to clipboard');
+                          }}
+                          className="text-[10px] font-bold text-[#71717a] hover:text-white uppercase transition-colors px-2 py-1 bg-[#18181b] rounded border border-white/5"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      <div className="p-4 bg-orange-500/5 border border-orange-500/20 rounded-xl space-y-3">
+                        <p className="text-xs text-[#a1a1aa] leading-relaxed">
+                          Enter this <span className="font-bold text-orange-400">Short URL</span> in your KOReader <span className="font-bold">Sync plugin</span> settings. 
+                          By using the shortened route, you bypass the long versioned path while maintaining full compatibility.
+                        </p>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-orange-400/80">
+                           <CheckCircle2 size={12} /> NO SERVER RESTART REQUIRED
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <h2 className="text-xl font-bold mb-6 flex items-center gap-3 text-[#34d399]">
                     <Library size={20} /> Ebook Library

@@ -4,7 +4,8 @@ import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 import Database from 'better-sqlite3';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
+import AdmZip from 'adm-zip';
 
 function logToFile(filename: string, message: string) {
   const timestamp = new Date().toISOString();
@@ -73,19 +74,18 @@ async function startServer() {
         key TEXT PRIMARY KEY,
         value TEXT
       );
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        username TEXT UNIQUE,
-        password TEXT
-      );
       CREATE TABLE IF NOT EXISTS books (
         id TEXT PRIMARY KEY,
         title TEXT,
         author TEXT,
+        description TEXT,
         filePath TEXT,
         coverPath TEXT,
-        status TEXT DEFAULT 'queue', -- queue, reading, archived, trash
+        status TEXT DEFAULT 'library',
         progress TEXT,
+        size INTEGER,
+        pages INTEGER,
+        format TEXT,
         isReading INTEGER DEFAULT 0,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
       );
@@ -123,6 +123,9 @@ async function startServer() {
       return res.status(400).json({ error: 'invalid-path', message: 'Library path not set or invalid.' });
     }
 
+    const coversDir = path.join(process.cwd(), 'data', 'covers');
+    if (!fs.existsSync(coversDir)) fs.mkdirSync(coversDir, { recursive: true });
+
     logToFile('service_log.txt', `Starting library scan at: ${libraryPath}`);
     
     const scanDir = (dir: string) => {
@@ -133,11 +136,39 @@ async function startServer() {
         if (stat.isDirectory()) {
           scanDir(fullPath);
         } else if (file.match(/\.(epub|pdf|mobi|azw3)$/i)) {
-          const id = path.basename(file, path.extname(file)); // Simple ID for now
+          const stats = fs.statSync(fullPath);
+          const md5 = createHash('md5').update(fullPath).digest('hex');
+          const coverTxtPath = path.join(coversDir, `${md5}.txt`);
+          
+          let coverPath = '';
+          if (fs.existsSync(coverTxtPath)) {
+            coverPath = `/api/covers/${md5}`;
+          } else {
+            // Try extract cover (Basic EPUB extraction)
+            try {
+              if (file.toLowerCase().endsWith('.epub')) {
+                const zip = new AdmZip(fullPath);
+                const zipEntries = zip.getEntries();
+                // Look for cover image
+                const coverEntry = zipEntries.find(e => e.entryName.toLowerCase().includes('cover') && e.entryName.match(/\.(jpg|jpeg|png)$/i));
+                if (coverEntry) {
+                   const base64 = zip.readFile(coverEntry).toString('base64');
+                   fs.writeFileSync(coverTxtPath, `data:image/jpeg;base64,${base64}`);
+                   coverPath = `/api/covers/${md5}`;
+                }
+              }
+            } catch (e) {
+              logToFile('service_log.txt', `Cover extraction failed for ${file}`);
+            }
+          }
+
+          const id = path.basename(file, path.extname(file));
           const exists = db.prepare('SELECT id FROM books WHERE filePath = ?').get(fullPath);
           if (!exists) {
-            db.prepare('INSERT INTO books (id, title, author, filePath, status) VALUES (?, ?, ?, ?, ?)')
-              .run(randomUUID(), file, 'Unknown', fullPath, 'library');
+            db.prepare(`
+              INSERT INTO books (id, title, author, filePath, coverPath, size, format, status) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(randomUUID(), id, 'Unknown', fullPath, coverPath, stats.size, path.extname(file).slice(1), 'library');
             logToFile('service_log.txt', `Indexed new book: ${file}`);
           }
         }
@@ -163,6 +194,17 @@ async function startServer() {
     const { key, value } = req.body;
     db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
     res.json({ success: true });
+  });
+
+  // Cover serving
+  app.get('/api/covers/:md5', (req, res) => {
+    const { md5 } = req.params;
+    const p = path.join(process.cwd(), 'data', 'covers', `${md5}.txt`);
+    if (fs.existsSync(p)) {
+      res.send(fs.readFileSync(p, 'utf8'));
+    } else {
+      res.status(404).send('Not found');
+    }
   });
 
   // System Update
@@ -191,6 +233,12 @@ async function startServer() {
       success: true, 
       message: 'Update command issued. Please run the PowerShell one-liner to complete the upgrade.' 
     });
+  });
+
+  // Shortened Sync Route for KOReader
+  app.use('/sync', (req, res, next) => {
+    req.url = '/koreader/sync/v1' + req.url;
+    next();
   });
 
   // Health check
