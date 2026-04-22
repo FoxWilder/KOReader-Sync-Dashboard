@@ -204,11 +204,11 @@ export default function App() {
   ];
 
   const [libraryPath, setLibraryPath] = useState('');
-  const [updateInfo, setUpdateInfo] = useState<{ updateAvailable: boolean; latestVersion: string; currentVersion: string } | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<{ updateAvailable: boolean; latestVersion: string; currentVersion: string; releaseNotes?: string } | null>(null);
   const [updating, setUpdating] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState<any>(null);
-  const [columns, setColumns] = useState(4);
+  const [columns, setColumns] = useState(5);
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [fetchingNews, setFetchingNews] = useState(false);
   const [newRepo, setNewRepo] = useState('');
@@ -219,8 +219,8 @@ export default function App() {
         const width = window.innerWidth;
         const sidebarWidth = width >= 768 ? 256 : 80;
         const availableWidth = width - sidebarWidth - 80; // Main section padding
-        // Aiming for 4-5 cards by decreasing the divisor
-        const cols = Math.max(1, Math.floor(availableWidth / 200));
+        // Decrease divisor to ensure at least 4-5 on standard widths
+        const cols = Math.max(4, Math.floor(availableWidth / 180));
         setColumns(cols);
       });
     };
@@ -331,6 +331,40 @@ export default function App() {
   };
 
   const applyUpdate = async () => {
+    if (!updateInfo?.updateAvailable) return;
+
+    // Show release notes in a toast and ask for confirmation
+    const confirmToast = toast((t) => (
+      <div className="space-y-4 p-2 max-w-sm">
+        <div className="flex items-center gap-3 text-blue-400">
+          <Zap size={20} className="animate-pulse" />
+          <p className="font-black uppercase tracking-tighter text-sm">Release Intelligence: {updateInfo.latestVersion}</p>
+        </div>
+        <div className="max-h-48 overflow-y-auto text-[10px] font-medium text-[#71717a] leading-relaxed bg-black/30 p-3 rounded-lg border border-white/5 scrollbar-hide">
+          {updateInfo.releaseNotes}
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => {
+              toast.dismiss(t.id);
+              executeUpgrade();
+            }}
+            className="flex-grow bg-[#34d399] text-black py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] transition-all"
+          >
+            Confirm Upgrade
+          </button>
+          <button 
+            onClick={() => toast.dismiss(t.id)}
+            className="bg-white/5 border border-white/10 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest"
+          >
+            Abort
+          </button>
+        </div>
+      </div>
+    ), { duration: 10000, position: 'bottom-right' });
+  };
+
+  const executeUpgrade = async () => {
     setUpdating(true);
     const updateToast = toast.loading('Initiating core system upgrade...');
     
@@ -409,18 +443,50 @@ export default function App() {
           ))}
         </nav>
 
-        <div className="mt-auto p-6 md:p-8">
-          <div className="flex items-center gap-4 p-4 bg-white/5 rounded-3xl border border-white/5 hover:border-white/10 transition-all cursor-default overflow-hidden">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#18181b] to-[#27272a] border border-white/5 flex items-center justify-center shrink-0">
+        <div className="mt-auto p-6 md:p-8 space-y-4">
+          <div className="flex items-center gap-4 p-4 bg-white/5 rounded-3xl border border-white/5 hover:border-white/10 transition-all cursor-default overflow-hidden relative group">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#18181b] to-[#27272a] border border-white/5 flex items-center justify-center shrink-0 group-hover:border-[#34d399]/30 transition-colors">
               <User size={20} className="text-[#34d399]" />
             </div>
             <div className="text-xs hidden md:block">
-              <p className="font-black text-white uppercase tracking-tight">Admin</p>
+              <p className="font-black text-white uppercase tracking-tight">Admin Console</p>
               <div className="flex items-center gap-1.5 mt-0.5 opacity-60">
                  <div className="w-1 h-1 bg-[#34d399] rounded-full animate-pulse shadow-[0_0_5px_rgba(52,211,153,0.8)]" />
-                 <p className="text-[9px] font-black uppercase tracking-widest leading-none">Synapse Active</p>
+                 <p className="text-[9px] font-black uppercase tracking-widest leading-none">Status: Linked</p>
               </div>
             </div>
+          </div>
+
+          {/* Sidebar System Controls */}
+          <div className="hidden md:flex flex-col gap-2">
+            {!updateInfo ? (
+              <button 
+                onClick={checkForUpdates}
+                className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5 text-[#71717a] hover:text-white hover:bg-white/10 transition-all text-[10px] font-black uppercase tracking-widest shadow-xl group"
+              >
+                <RefreshCw size={14} className="group-hover:rotate-180 transition-transform duration-500" />
+                Poll Update Server
+              </button>
+            ) : updateInfo.updateAvailable ? (
+              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl space-y-3 shadow-2xl">
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Update Ready</p>
+                  <p className="text-[10px] font-mono text-white/40">{updateInfo.latestVersion}</p>
+                </div>
+                <button 
+                  onClick={applyUpdate}
+                  disabled={updating}
+                  className="w-full bg-blue-500 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-[0_10px_20px_rgba(59,130,246,0.3)] disabled:opacity-50"
+                >
+                  {updating ? 'Deploying...' : 'Initiate Upgrade'}
+                </button>
+              </div>
+            ) : (
+              <div className="p-4 bg-[#34d399]/5 border border-[#34d399]/10 rounded-2xl flex items-center justify-between">
+                <p className="text-[9px] font-black text-[#34d399] uppercase tracking-widest opacity-60">System Current</p>
+                <div className="w-1.5 h-1.5 bg-[#34d399] rounded-full opacity-40 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+              </div>
+            )}
           </div>
         </div>
       </aside>
@@ -501,26 +567,26 @@ export default function App() {
                         const percentage = progress?.percentage || 0;
 
                         return (
-                          <div className="p-3 h-full">
+                          <div className="p-2 h-full">
                             <motion.div 
                               whileHover={{ y: -8 }}
                               onClick={() => setSelectedBook(book)}
-                              className="group flex flex-col gap-3 cursor-pointer h-full"
+                              className="group flex flex-col gap-2 cursor-pointer h-full"
                             >
-                              <div className="aspect-[3/4] bg-[#0d0d0f] rounded-2xl border border-white/5 relative group-hover:border-[#34d399]/40 transition-all shadow-xl overflow-hidden shrink-0">
+                              <div className="aspect-[2/3] bg-[#0d0d0f] rounded-xl border border-white/5 relative group-hover:border-[#34d399]/40 transition-all shadow-xl overflow-hidden shrink-0">
                                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 z-10 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 
                                 {covers[book.id] ? (
                                   <img src={covers[book.id]} alt={book.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                                 ) : (
                                   <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center gap-2 bg-gradient-to-br from-[#0d0d0f] to-[#16161a]">
-                                    <BookOpen size={24} className="text-[#34d399]/10" strokeWidth={1.5} />
-                                    <p className="text-[8px] text-[#3f3f46] font-black uppercase tracking-[.2em] leading-normal opacity-50">No Cover</p>
+                                    <BookOpen size={20} className="text-[#34d399]/10" strokeWidth={1.5} />
+                                    <p className="text-[7px] text-[#3f3f46] font-black uppercase tracking-[.2em] leading-normal opacity-50">No Cover</p>
                                   </div>
                                 )}
                                 
                                 {percentage > 0 && (
-                                  <div className="absolute top-0 left-0 w-full h-1 bg-black/60 backdrop-blur-md z-20 overflow-hidden">
+                                  <div className="absolute top-0 left-0 w-full h-0.5 bg-black/60 backdrop-blur-md z-20 overflow-hidden">
                                     <motion.div 
                                       initial={{ width: 0 }}
                                       animate={{ width: `${percentage}%` }}
@@ -529,16 +595,16 @@ export default function App() {
                                   </div>
                                 )}
 
-                                <div className="absolute bottom-3 right-3 z-20 flex flex-col gap-2 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
-                                  <div className="bg-white/10 backdrop-blur-2xl border border-white/20 px-2 py-1 rounded-lg text-[8px] font-black text-white uppercase tracking-widest">
+                                <div className="absolute bottom-2 right-2 z-20 flex flex-col gap-1 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                                  <div className="bg-white/10 backdrop-blur-2xl border border-white/20 px-1.5 py-0.5 rounded-md text-[7px] font-black text-white uppercase tracking-widest uppercase">
                                     {book.format}
                                   </div>
                                 </div>
                               </div>
                               
-                              <div className="space-y-1 overflow-hidden">
-                                <h3 className="text-xs font-black truncate text-white tracking-tight leading-tight group-hover:text-[#34d399] transition-colors">{book.title}</h3>
-                                <p className="text-[9px] text-[#52525b] font-black truncate uppercase tracking-tighter opacity-80">{book.author}</p>
+                              <div className="space-y-0.5 flex-grow overflow-hidden">
+                                <h3 className="text-[10px] font-black truncate text-white tracking-tight leading-tight group-hover:text-[#34d399] transition-colors">{book.title}</h3>
+                                <p className="text-[8px] text-[#52525b] font-black truncate uppercase tracking-tighter opacity-80">{book.author}</p>
                               </div>
                             </motion.div>
                           </div>
@@ -933,60 +999,6 @@ export default function App() {
                         </p>
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                <div>
-                   <h2 className="text-xl font-bold mb-6 flex items-center gap-3 text-blue-400">
-                    <Zap size={20} /> Software Update
-                  </h2>
-                  <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6 shadow-xl">
-                    {!updateInfo ? (
-                      <button 
-                        onClick={checkForUpdates}
-                        className="w-full flex items-center justify-center gap-3 bg-[#18181b] border border-[#27272a] py-4 rounded-xl text-sm font-bold hover:border-blue-400/50 transition-all"
-                      >
-                        <RefreshCw size={18} /> Check for Updates
-                      </button>
-                    ) : (
-                      <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs font-bold text-[#71717a] uppercase mb-1">Status</p>
-                            <p className={`text-sm font-bold ${updateInfo.updateAvailable ? 'text-blue-400' : 'text-[#34d399]'}`}>
-                              {updateInfo.updateAvailable ? 'Update Available!' : 'System Up to Date'}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xs font-bold text-[#71717a] uppercase mb-1">Current Version</p>
-                            <p className="text-sm font-mono">{updateInfo.currentVersion}</p>
-                          </div>
-                        </div>
-
-                        {updateInfo.updateAvailable && (
-                          <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl space-y-4">
-                            <p className="text-xs">
-                              A new release <span className="font-bold text-blue-400">{updateInfo.latestVersion}</span> is available. 
-                              Applying the update will restart the server.
-                            </p>
-                            <button 
-                              onClick={applyUpdate}
-                              disabled={updating}
-                              className={`w-full flex items-center justify-center gap-3 bg-blue-500 text-white py-3 rounded-xl text-sm font-bold hover:bg-blue-600 transition-all ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              <Download size={18} />
-                              {updating ? 'Applying Update...' : 'Apply Update Now'}
-                            </button>
-                          </div>
-                        )}
-                        
-                        {!updateInfo.updateAvailable && (
-                          <p className="text-xs text-[#71717a] text-center">
-                            You are running the latest version of Wilder Sync.
-                          </p>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </div>
 

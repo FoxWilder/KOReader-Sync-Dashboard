@@ -256,7 +256,8 @@ async function startServer() {
       res.json({
         latestVersion: latest.tag_name,
         currentVersion,
-        updateAvailable: latest.tag_name !== currentVersion && !latest.tag_name.includes(currentVersion)
+        updateAvailable: latest.tag_name !== currentVersion && !latest.tag_name.includes(currentVersion),
+        releaseNotes: latest.body || 'No release notes available.'
       });
     } catch (e) {
       res.status(500).json({ error: 'update-check-failed' });
