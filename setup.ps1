@@ -1,6 +1,20 @@
 # Wilder Non-Docker Setup Script
 # This script sets up the Wilder reading stack (forked from Sake) without Docker.
 
+$repo = "FoxWilder/KOReader-Sync-Dashboard"
+$installDir = Get-Location
+$logFile = "$installDir\install_log.txt"
+
+# --- LOGGING WRAPPER ---
+function Write-Log([string]$message, [string]$color = "White") {
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $fullMessage = "[$timestamp] [SETUP] $message"
+    if ($Host.Name -ne 'ConsoleHost') {
+        Write-Host $message -ForegroundColor $color
+    }
+    $fullMessage | Out-File -FilePath $logFile -Append
+}
+
 Write-Host "--- Wilder Setup Starting ---" -ForegroundColor Cyan
 Write-Log "Setup started"
 

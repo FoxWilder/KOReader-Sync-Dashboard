@@ -58,7 +58,26 @@ export default function App() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Detect if we are in a preview environment (AI Studio or GitHub Pages)
+  const isPreview = typeof window !== 'undefined' && (
+     window.location.hostname.includes('github.io') || 
+     window.location.hostname.includes('run.app') ||
+     window.location.hostname.includes('google-usercontent.com')
+  );
+
   const fetchBooks = async () => {
+    if (isPreview) {
+      setBooks([
+        { id: '1', title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1490528560i/4671.jpg', status: 'reading', isReading: 1 },
+        { id: '2', title: '1984', author: 'George Orwell', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1532714506i/40961427.jpg', status: 'queue', isReading: 0 },
+        { id: '3', title: 'Crime and Punishment', author: 'Fyodor Dostoevsky', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1382846449i/7144.jpg', status: 'archived', isReading: 0 },
+        { id: '4', title: 'Brave New World', author: 'Aldous Huxley', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1546971276i/435039.jpg', status: 'library', isReading: 0 },
+        { id: '5', title: 'The Hobbit', author: 'J.R.R. Tolkien', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1372847500i/5907.jpg', status: 'reading', isReading: 1 },
+        { id: '6', title: 'Fahrenheit 451', author: 'Ray Bradbury', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1383718290i/13079982.jpg', status: 'queue', isReading: 0 },
+      ]);
+      return;
+    }
+
     try {
       const statusParam = ['library', 'deployment', 'settings', 'stats'].includes(activeTab) ? '' : `?status=${activeTab}`;
       const res = await fetch(`/api/books${statusParam}`);
@@ -66,25 +85,21 @@ export default function App() {
       setBooks(data);
     } catch (e) {
       console.error(e);
-      // Fallback mock
-      if (books.length === 0) {
-        setBooks([
-          { id: '1', title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1490528560i/4671.jpg', status: 'reading', isReading: 1 },
-          { id: '2', title: '1984', author: 'George Orwell', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1532714506i/40961427.jpg', status: 'queue', isReading: 0 },
-          { id: '3', title: 'Crime and Punishment', author: 'Fyodor Dostoevsky', coverPath: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1382846449i/7144.jpg', status: 'archived', isReading: 0 },
-        ]);
-      }
     }
   };
 
   const fetchStats = async () => {
+    if (isPreview) {
+      setStats({ total: 154, reading: 3, completed: 42, uptime: 3600 * 24 * 7 });
+      return;
+    }
+
     try {
       const res = await fetch('/api/stats');
       const data = await res.json();
       setStats(data);
     } catch (e) {
       console.error(e);
-      setStats({ total: 12, reading: 2, completed: 5, uptime: 1234 });
     }
   };
 
@@ -180,7 +195,10 @@ export default function App() {
             <div className="flex items-center gap-2 text-[10px] font-bold text-[#34d399]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#34d399] animate-pulse"></span> SYSTEM READY
             </div>
-            <button className="bg-white text-black px-4 py-1.5 rounded-md text-xs font-bold hover:bg-[#e4e4e7] transition-all flex items-center gap-2">
+            <button 
+              onClick={() => alert('Importing books requires a running server. In this preview, check your local installation for the full experience!')}
+              className="bg-white text-black px-4 py-1.5 rounded-md text-xs font-bold hover:bg-[#e4e4e7] transition-all flex items-center gap-2"
+            >
               <Plus size={14} /> Import
             </button>
           </div>

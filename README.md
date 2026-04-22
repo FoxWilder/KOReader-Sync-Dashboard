@@ -1,34 +1,46 @@
 # 📚 Wilder Sync Dashboard
 *(Forked from [Sudashiii/Sake](https://github.com/Sudashiii/Sake))*
 
-A polished, **Docker-free** reading stack optimized for Windows Server 2025. This project provides a clean web library, KOReader progress syncing, and book management without the complexity of Docker.
+**Wilder Sync** is a premium, **Docker-free** self-hosted ecosystem for your ebook library and reading progress. It transforms your server into a centralized hub for all your reading devices, specifically optimized for **Windows Server 2025**.
+
+## 📖 Key Functionality
+
+### 🏛️ Centralized Ebook Library
+*   **Visual Management**: browse your collection with a responsive, high-performance web dashboard.
+*   **Reading Pipeline**: Manage books through different states: *Library*, *Currently Reading*, *Queue*, *Archived*, and *Trash*.
+*   **Advanced search**: Instantly find any book across your entire database.
+
+### 🔄 KOReader Synchronization
+*   **Zero-Config Sync**: Seamlessly sync reading positions, highlights, and document status between multiple KOReader devices.
+*   **Standard Protocol**: Implements the official KOReader Sync v1 protocol for maximum compatibility.
+*   **Auth Privacy**: Secure tokens for private synchronization without third-party cloud dependency.
 
 ## 🚀 One-Line Installation
 
-**IMPORTANT**: Open PowerShell and `cd` into the folder where you want the installation files to be placed (e.g. `C:\Wilder`). Then run:
+**IMPORTANT**: Open PowerShell and `cd` into the folder where you want the installation files to be placed (e.g. `C:\Wilder`). **The manager will install all files into the current working directory.**
 
 ```powershell
 # Standard Install / Upgrade (Latest Release)
 iwr -useb https://raw.githubusercontent.com/FoxWilder/KOReader-Sync-Dashboard/main/install.ps1 | iex
-
-# Install Significant Version (Rollback/Forward)
-$v = "v1.0.0"; iwr -useb https://raw.githubusercontent.com/FoxWilder/KOReader-Sync-Dashboard/main/install.ps1 | iex -Arguments "-Version $v"
-
-# Uninstall and Cleanup (Deletes files and database)
-iwr -useb https://raw.githubusercontent.com/FoxWilder/KOReader-Sync-Dashboard/main/install.ps1 | iex -Arguments "-Uninstall"
 ```
 
-*The setup automatically handles data migration and backups during upgrades, and allows complete cleanup via the `-Uninstall` flag.*
+### 💎 Switching Between Versions
 
-## ✨ Features
+You can easily roll forward or backward by specifying the version tag (e.g., `v1.0.1`) or a rolling commit hash (e.g., `rolling-20260422-b1d75cf`):
 
-- **Docker-Free**: Runs natively using Node.js and Python.
-- **SQLite Database**: Replaces PostgreSQL for zero-config local storage.
-- **Local Storage**: Replaces MinIO/S3 with standard filesystem storage.
-- **Automated Workflow**: 
-  - **Releases**: Every tag upload triggers a new GitHub Release with a bundled ZIP.
-  - **Preview**: A web landing page is automatically deployed to GitHub Pages.
-- **Windows Server Optimized**: Tailored for the Windows Server 2025 environment.
+```powershell
+# Install a specific tagged version
+$v = "v1.0.0"; iwr -useb https://raw.githubusercontent.com/FoxWilder/KOReader-Sync-Dashboard/main/install.ps1 | iex -Arguments "-Version $v"
+
+# Install a specific rolling release (from CI/CD)
+$v = "rolling-20260422-b1d75cf"; iwr -useb https://raw.githubusercontent.com/FoxWilder/KOReader-Sync-Dashboard/main/install.ps1 | iex -Arguments "-Version $v"
+```
+
+## ✨ Tech Stack (Non-Docker)
+*   **Backend**: Node.js (Express) with `better-sqlite3`.
+*   **Database**: SQLite (`wilder.db`) replaces PostgreSQL.
+*   **Storage**: Standard local filesystem replaces S3/MinIO.
+*   **Dev Ops**: Native PowerShell automation for Lifecycle Management.
 
 ## 🛠️ Manual Instructions
 

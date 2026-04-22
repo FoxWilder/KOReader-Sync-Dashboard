@@ -34,10 +34,10 @@ if ($Uninstall) {
     if ($confirm) {
         Write-Log "Uninstalling..." "Yellow"
         # Stop any running processes
-        Get-Process | Where-Object { $_.CommandLine -like "*tsx server.ts*" -or $_.CommandLine -like "*node*" } | Stop-Process -ErrorAction SilentlyContinue 
+        Get-Process | Where-Object { $_.CommandLine -like "*server.ts*" -or $_.CommandLine -like "*node*" } | Stop-Process -ErrorAction SilentlyContinue 
         
         Write-Log "Removing files..."
-        $filesToRemove = "dist", "node_modules", "wilder.db", "sake.db", ".env", "package.json", "package-lock.json", "setup.ps1", "migrate.py", "server.ts", "service_log.txt", "sync_log.txt", "install_log.txt"
+        $filesToRemove = "dist", "node_modules", "wilder.db", "sake.db", ".env", "package.json", "package-lock.json", "setup.ps1", "migrate.py", "server.ts", "service_log.txt", "sync_log.txt", "install_log.txt", "drizzle.config.ts"
         foreach ($f in $filesToRemove) {
             if (Test-Path "$installDir\$f") { Remove-Item -Recurse -Force "$installDir\$f" }
         }
@@ -97,12 +97,13 @@ if ($isUpdate) {
     Write-Log "Creating safety backups..."
     $backupDir = ".backup_$([DateTime]::Now.ToString('yyyyMMddHHmmss'))"
     New-Item -ItemType Directory -Path $backupDir | Out-Null
+    if (Test-Path "wilder.db") { Copy-Item "wilder.db" "$backupDir/wilder.db" }
     if (Test-Path "sake.db") { Copy-Item "sake.db" "$backupDir/sake.db" }
     if (Test-Path ".env") { Copy-Item ".env" "$backupDir/.env" }
 }
 
 # 4. Download
-$tempFile = "$env:TEMP\sake-$($releaseInfo.tag_name).zip"
+$tempFile = "$env:TEMP\wilder-$($releaseInfo.tag_name).zip"
 Write-Log "Downloading from $assetUrl..."
 Invoke-WebRequest -Uri $assetUrl -OutFile $tempFile
 
@@ -121,8 +122,11 @@ Write-Log "--- Operation Successful ---" "Green"
 if ($isUpdate) { Write-Log "Note: Previous database backup saved in $backupDir" "Gray" }
 
 Write-Log "Starting Wilder Dashboard service..." "Cyan"
-# Start the server in the background and detached from current script
-Start-Process -FilePath "npm" -ArgumentList "run dev" -WindowStyle Hidden -WorkingDirectory $installDir
+# Start the server using npm.cmd for Windows compatibility
+$npmCmd = "npm"
+if ($IsWindows) { $npmCmd = "npm.cmd" }
+
+Start-Process -FilePath $npmCmd -ArgumentList "run dev" -WindowStyle Hidden -WorkingDirectory $installDir
 
 Write-Log "Dashboard is active. It will run in the background."
 Write-Log "Portable service started at http://localhost:3000"
