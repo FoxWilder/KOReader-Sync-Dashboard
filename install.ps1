@@ -85,7 +85,10 @@ try {
         exit 1
     }
     $assetUrl = $asset.browser_download_url
-    Write-Log "Target Version: $($releaseInfo.tag_name)" "Magenta"
+    Write-Log "**************************************************" "Magenta"
+    Write-Log "   TARGET VERSION: $($releaseInfo.tag_name)" "Cyan"
+    Write-Log "   RELEASE DATE  : $($releaseInfo.published_at)" "Gray"
+    Write-Log "**************************************************" "Magenta"
 } catch {
     Write-Log "ERROR: Failed to fetch version info. API may be rate limited or repo has no releases." "Red"
     Write-Error "Failed to fetch version '$Version'. Check if it exists at https://github.com/$repo/releases. Error: $($_.Exception.Message)"
@@ -133,24 +136,26 @@ if ($process) {
     Write-Log "Service logs will appear below. Press Ctrl+C to close this manager window." "Yellow"
     Write-Log "(The service will continue running even if you close this window)" "Gray"
     
-    # Wait for logs to be initialized by the server (max 10s)
+    # Wait for logs to be initialized by the server (max 20s)
     $retry = 0
-    while (-not (Test-Path "service_log.txt") -and $retry -lt 10) {
+    while (-not (Test-Path "service_log.txt") -and $retry -lt 20) {
         Start-Sleep -Seconds 1
         $retry++
     }
     
     if (Test-Path "service_log.txt") {
         Write-Log "Service is now live. Tailing logs..." "Magenta"
-        Get-Content -Path "service_log.txt" -Wait -Tail 20
+        # Watch for the "listening" message
+        $isListening = $false
+        Get-Content -Path "service_log.txt" -Wait -Tail 20 | ForEach-Object {
+            $_ # Output the log line
+            if ($_ -like "*Server successfully listening*") {
+                Write-Log "--- SUCCESS: Wilder is online at http://localhost:3000 ---" "Green"
+            }
+        }
     } else {
-        Write-Log "CRITICAL: Service failed to initialize log files within 15s." "Red"
-        Write-Log "Possible causes:"
-        Write-Log "1. Node.js/tsx is not in your PATH."
-        Write-Log "2. 'better-sqlite3' failed to load its native binary."
-        Write-Log "3. server.ts has a syntax error."
-        Write-Log "Check 'install_log.txt' for details."
+        Write-Log "CRITICAL: Service failed to initialize log files within 20s." "Red"
+        Write-Log "Check if another service is already using port 3000." "Yellow"
+        Write-Log "You can try running 'npm run dev' manually to see immediate errors."
     }
-} else {
-    Write-Log "ERROR: Failed to start the dashboard process." "Red"
 }

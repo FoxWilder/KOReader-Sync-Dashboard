@@ -29,6 +29,7 @@ async function startServer() {
   
   logToFile('service_log.txt', `Attempting to initialize database at ${path.join(process.cwd(), 'wilder.db')}...`);
   const db = new Database('wilder.db');
+  logToFile('service_log.txt', 'Database connection established.');
 
   // service_log.txt for general web requests
   app.use((req, res, next) => {
@@ -45,6 +46,7 @@ async function startServer() {
   });
 
   // Initialize DB tables
+  logToFile('service_log.txt', 'Initializing database tables...');
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -70,6 +72,7 @@ async function startServer() {
       PRIMARY KEY (userId, documentId)
     );
   `);
+  logToFile('service_log.txt', 'Database tables initialized.');
 
   app.use(express.json());
 
@@ -77,12 +80,18 @@ async function startServer() {
   app.use('/data', express.static(path.join(process.cwd(), 'data')));
 
   // --- API ROUTES ---
+  logToFile('service_log.txt', 'Setting up API routes...');
 
   // Auth - Simplified for now
   app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
     // Mock user for now
     res.json({ token: 'mock-token', user: { id: '1', username: 'admin' } });
+  });
+
+  // Health check
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', version: '1.1.0' });
   });
 
   // Library
@@ -169,12 +178,20 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
+    logToFile('service_log.txt', 'Initializing Vite middleware...');
+    try {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+      logToFile('service_log.txt', 'Vite middleware initialized.');
+    } catch (e) {
+      logToFile('service_log.txt', `ERROR: Vite failed to start: ${e}`);
+      console.error('Vite failed to start:', e);
+    }
   } else {
+    logToFile('service_log.txt', 'Serving production build from dist/');
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
@@ -183,6 +200,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
+    logToFile('service_log.txt', `Server successfully listening on http://0.0.0.0:${PORT}`);
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

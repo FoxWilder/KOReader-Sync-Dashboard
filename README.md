@@ -1,7 +1,14 @@
 # 📚 Wilder Sync Dashboard
 *(Forked from [Sudashiii/Sake](https://github.com/Sudashiii/Sake))*
 
-**Wilder Sync** is a premium, **Docker-free** self-hosted ecosystem for your ebook library and reading progress. It transforms your server into a centralized hub for all your reading devices, specifically optimized for **Windows Server 2025**.
+**Wilder Sync** is a premium, **Docker-free** self-hosted ecosystem for your ebook library and reading progress. It transforms your Windows Server into a centralized hub for all your reading devices, specifically optimized for **Native Windows Server 2025** execution without Docker, WSL, or Containers.
+
+## 🏛️ 100% Native Windows Solution
+This project is built from the ground up to run directly on Windows:
+*   **No Docker Required**: Skip the storage/networking overhead of containers.
+*   **Native SQLite**: Zero-config, high-performance local database.
+*   **PowerShell Managed**: Every aspect of the lifecycle—install, backup, upgrade, and service management—is handled by native PowerShell scripts.
+*   **Portable Service**: All data, logs, and binaries stay inside the directory you choose.
 
 ## 📖 Key Functionality
 
