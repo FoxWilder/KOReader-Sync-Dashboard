@@ -35,8 +35,15 @@ import {
   BookMarked,
   X,
   Database,
-  Newspaper
+  Newspaper,
+  Brain,
+  Layers,
+  Users,
+  Sparkles,
+  Command
 } from 'lucide-react';
+import { aiService } from './services/aiService';
+import { Reader } from './components/Reader';
 
 interface Book {
   id: string;
@@ -79,6 +86,13 @@ interface NewsItem {
 
 type Tab = 'library' | 'reading' | 'queue' | 'stats' | 'archived' | 'trash' | 'settings' | 'news';
 
+interface UserProfile {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl?: string;
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('library');
   const [books, setBooks] = useState<Book[]>([]);
@@ -87,6 +101,17 @@ export default function App() {
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [selectedStat, setSelectedStat] = useState<string | null>(null);
   const [covers, setCovers] = useState<Record<string, string>>({});
+  
+  // Advanced Features State
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [readerBookId, setReaderBookId] = useState<string | null>(null);
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
+  const [semanticResults, setSemanticResults] = useState<string[] | null>(null);
+  const [forensicsBookId, setForensicsBookId] = useState<string | null>(null);
+  const [forensicsQuery, setForensicsQuery] = useState('');
+  const [forensicsResults, setForensicsResults] = useState<any[]>([]);
+  const [isSearchingForensics, setIsSearchingForensics] = useState(false);
 
   // Detect if we are in a preview environment (AI Studio or GitHub Pages)
   const isPreview = typeof window !== 'undefined' && (
@@ -211,6 +236,23 @@ export default function App() {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [fetchingNews, setFetchingNews] = useState(false);
   const [newRepo, setNewRepo] = useState('');
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/users');
+      const data = await res.json();
+      setUsers(data);
+      if (data.length > 0 && !currentUser) {
+        setCurrentUser(data[0]);
+      }
+    } catch (e) {
+      console.error("Failed to fetch users:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   useEffect(() => {
     const updateColumns = () => {
@@ -394,6 +436,87 @@ export default function App() {
     }
   };
 
+  const handleAiCategorization = async () => {
+    const uncatBooks = books.filter(b => !b.aiSector);
+    if (uncatBooks.length === 0) {
+      toast.success('All books optimized by neural engine.');
+      return;
+    }
+
+    setIsAiProcessing(true);
+    const aiToast = toast.loading('Synchronizing with Gemini Neural Engine...');
+    
+    try {
+      const meta = uncatBooks.slice(0, 50).map(b => ({
+        id: b.id,
+        title: b.title,
+        author: b.author,
+        description: b.description || ''
+      }));
+
+      const sectors = await aiService.categorizeBooks(meta);
+      
+      for (const [id, sector] of Object.entries(sectors)) {
+        await fetch(`/api/books/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ aiSector: sector })
+        });
+      }
+
+      toast.success(`Neural classification complete for ${Object.keys(sectors).length} units.`, { id: aiToast });
+      fetchBooks();
+    } catch (e) {
+      toast.error('Neural engine timeout or sync failure.', { id: aiToast });
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+
+  const handleSemanticSearch = async (query: string) => {
+    if (!query.trim()) {
+      setSemanticResults(null);
+      return;
+    }
+
+    const aiToast = toast.loading('Executing Semantic Vector Scan...', { duration: 1000 });
+    try {
+      const meta = books.map(b => ({
+        id: b.id,
+        title: b.title,
+        author: b.author,
+        description: b.description || ''
+      }));
+      const results = await aiService.semanticSearch(query, meta);
+      setSemanticResults(results);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const searchForensics = async () => {
+    if (!forensicsQuery || !forensicsBookId) return;
+    setIsSearchingForensics(true);
+    try {
+      const res = await fetch(`/api/books/${forensicsBookId}/search?q=${encodeURIComponent(forensicsQuery)}`);
+      const data = await res.json();
+      setForensicsResults(data.results || []);
+    } catch (e) {
+      toast.error('Forensics extraction failed.');
+    } finally {
+      setIsSearchingForensics(false);
+    }
+  };
+
+  const finalFilteredBooks = useMemo(() => {
+    let list = filteredBooks;
+    if (semanticResults) {
+      list = list.filter(b => semanticResults.includes(b.id))
+                 .sort((a, b) => semanticResults.indexOf(a.id) - semanticResults.indexOf(b.id));
+    }
+    return list;
+  }, [filteredBooks, semanticResults]);
+
   const parseProgress = (progStr?: string) => {
     if (!progStr) return null;
     try {
@@ -452,15 +575,59 @@ export default function App() {
         </nav>
 
         <div className="mt-auto p-6 md:p-8 space-y-4">
-          <div className="flex items-center gap-4 p-4 bg-white/5 rounded-3xl border border-white/5 hover:border-white/10 transition-all cursor-default overflow-hidden relative group">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#18181b] to-[#27272a] border border-white/5 flex items-center justify-center shrink-0 group-hover:border-[#34d399]/30 transition-colors">
-              <User size={20} className="text-[#34d399]" />
+          {/* Enhanced Profile Switcher */}
+          <div className="flex flex-col gap-3 mb-6 hidden md:flex">
+            <div className="flex items-center justify-between px-1">
+               <span className="text-[8px] font-black text-[#3f3f46] uppercase tracking-[0.4em]">Intelligence Profiles</span>
+               <button onClick={fetchUsers} className="text-[#3f3f46] hover:text-[#34d399] transition-colors">
+                  <RefreshCw size={10} />
+               </button>
+            </div>
+            <div className="space-y-2">
+              {users.map(user => (
+                <button 
+                  key={user.id}
+                  onClick={() => setCurrentUser(user)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-2xl border transition-all duration-300 group
+                    ${currentUser?.id === user.id 
+                      ? 'bg-[#34d399]/5 border-[#34d399]/20 shadow-[0_0_20px_rgba(52,211,153,0.1)]' 
+                      : 'bg-transparent border-white/5 hover:border-white/10 opacity-40 hover:opacity-100'}`}
+                >
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs transition-colors
+                    ${currentUser?.id === user.id ? 'bg-[#34d399] text-black' : 'bg-white/5 text-[#52525b] group-hover:text-white'}`}>
+                    {user.displayName.charAt(0)}
+                  </div>
+                  <div className="text-left overflow-hidden">
+                    <p className={`text-[10px] font-black uppercase tracking-tight truncate ${currentUser?.id === user.id ? 'text-white' : 'text-[#71717a]'}`}>
+                      {user.displayName}
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                       <div className={`w-1 h-1 rounded-full ${currentUser?.id === user.id ? 'bg-[#34d399]' : 'bg-[#3f3f46]'}`} />
+                       <p className="text-[7px] font-black uppercase tracking-[0.2em] text-[#3f3f46]">Silo ID: {user.id.split('-')[0]}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+              <button 
+                className="w-full flex items-center gap-3 p-3 rounded-2xl border border-dashed border-white/10 text-[#3f3f46] hover:border-[#34d399]/30 hover:text-[#34d399] transition-all group"
+              >
+                <div className="w-8 h-8 rounded-xl border border-dashed border-white/10 flex items-center justify-center group-hover:border-[#34d399]/30">
+                  <Plus size={14} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest">New Sync Bucket</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 p-4 bg-white/5 rounded-3xl border border-white/5 transition-all cursor-default overflow-hidden relative group">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#18181b] to-[#27272a] border border-white/5 flex items-center justify-center shrink-0">
+              <Activity size={20} className="text-[#34d399]" />
             </div>
             <div className="text-xs hidden md:block">
-              <p className="font-black text-white uppercase tracking-tight">Admin Console</p>
+              <p className="font-black text-white uppercase tracking-tight">Sync Engine v2.4</p>
               <div className="flex items-center gap-1.5 mt-0.5 opacity-60">
                  <div className="w-1 h-1 bg-[#34d399] rounded-full animate-pulse shadow-[0_0_5px_rgba(52,211,153,0.8)]" />
-                 <p className="text-[9px] font-black uppercase tracking-widest leading-none">Status: Linked</p>
+                 <p className="text-[9px] font-black uppercase tracking-widest leading-none">Status: NOMINAL</p>
               </div>
             </div>
           </div>
@@ -501,32 +668,48 @@ export default function App() {
 
       {/* Dynamic Viewport */}
       <main className="flex-grow flex flex-col overflow-hidden relative">
-        {/* Transparent Header */}
-        <header className="h-24 flex items-center justify-between px-10 relative z-10">
-          <div className="flex items-center gap-8 flex-grow max-w-3xl">
+        {/* Modern Header */}
+        <header className="h-24 flex items-center justify-between px-10 relative z-10 gap-10">
+          <div className="flex items-center gap-6 flex-grow max-w-4xl">
             <div className="relative flex-grow group">
               <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-[#3f3f46] group-focus-within:text-[#34d399] transition-colors" size={20} />
               <input 
                 type="text" 
-                placeholder="Search series, author, identifier..." 
+                placeholder="Search series, author, or neural identifiers..." 
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#111114]/50 border border-white/5 pl-14 pr-6 py-4 rounded-[1.5rem] text-sm focus:border-[#34d399]/30 focus:bg-[#111114] outline-none transition-all placeholder:text-[#3f3f46] font-medium"
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  if (!e.target.value) setSemanticResults(null);
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && handleSemanticSearch(searchQuery)}
+                className="w-full bg-[#111114]/50 border border-white/5 pl-14 pr-32 py-4 rounded-[1.5rem] text-sm focus:border-[#34d399]/30 focus:bg-[#111114] outline-none transition-all placeholder:text-[#3f3f46] font-medium"
               />
+              <button 
+                onClick={() => handleSemanticSearch(searchQuery)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 px-4 py-2 bg-[#34d399]/10 border border-[#34d399]/20 rounded-xl hover:bg-[#34d399]/20 transition-all text-[9.5px] font-black text-[#34d399] uppercase tracking-widest"
+              >
+                <Brain size={14} />
+                Semantic Scan
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-8">
-            {scanning && (
-              <motion.div 
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="flex items-center gap-4 px-5 py-2.5 bg-[#34d399]/5 border border-[#34d399]/20 rounded-2xl"
-              >
-                 <RefreshCw size={16} className="text-[#34d399] animate-spin" />
-                 <span className="text-[10px] font-black uppercase tracking-[.2em] text-[#34d399]">Indexing Engine</span>
-              </motion.div>
-            )}
+          <div className="flex items-center gap-6 shrink-0">
+            <button 
+              onClick={handleAiCategorization}
+              disabled={isAiProcessing}
+              className={`p-4 rounded-2xl border transition-all flex items-center gap-3
+                ${isAiProcessing 
+                  ? 'bg-[#34d399]/10 border-[#34d399]/20 text-[#34d399]' 
+                  : 'bg-white/5 border-white/5 text-[#a1a1aa] hover:border-[#34d399]/30 hover:text-white'}`}
+            >
+              <Sparkles size={18} className={isAiProcessing ? "animate-pulse" : ""} />
+              <span className="text-[10px] font-black uppercase tracking-widest hidden lg:block">Neural Refinement</span>
+            </button>
+            
+            <button className="w-14 h-14 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-[#52525b] hover:text-white transition-all hover:bg-white/10">
+              <Plus size={24} />
+            </button>
           </div>
         </header>
 
@@ -574,7 +757,7 @@ export default function App() {
                     >
                       {({ rowIndex, colIndex }) => {
                         const bookIndex = rowIndex * columns + colIndex;
-                        const book = filteredBooks[bookIndex];
+                        const book = (finalFilteredBooks || [])[bookIndex];
                         if (!book) return null;
                         const progress = parseProgress(book.progress);
                         const percentage = progress?.percentage || 0;
@@ -608,7 +791,12 @@ export default function App() {
                                   </div>
                                 )}
 
-                                <div className="absolute bottom-2 right-2 z-20 flex flex-col gap-1 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                                <div className="absolute top-2 right-2 z-20 flex flex-col gap-1 items-end">
+                                  {(book as any).aiSector && (
+                                    <div className="px-2 py-1 bg-[#34d399] text-black text-[7px] font-black rounded uppercase tracking-tighter shadow-xl italic">
+                                      {(book as any).aiSector}
+                                    </div>
+                                  )}
                                   <div className="bg-white/10 backdrop-blur-2xl border border-white/20 px-1.5 py-0.5 rounded-md text-[7px] font-black text-white uppercase tracking-widest">
                                     {book.format}
                                   </div>
@@ -704,7 +892,7 @@ export default function App() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
                           {[
                             { label: 'Sync State', value: `${Math.round(parseProgress(selectedBook.progress)?.percentage || 0)}%`, color: 'text-[#34d399]' },
-                            { label: 'Language', value: selectedBook.language?.toUpperCase() || 'EN', color: 'text-white/60' },
+                            { label: 'Intelligence Sector', value: (selectedBook as any).aiSector?.toUpperCase() || 'UNCATEGORIZED', color: 'text-orange-400' },
                             { label: 'Classification', value: selectedBook.status.toUpperCase(), color: 'text-blue-400' },
                             { label: 'Archival Date', value: new Date(selectedBook.createdAt as any).toLocaleDateString(), color: 'text-[#52525b]' }
                           ].map((stat, i) => (
@@ -718,13 +906,13 @@ export default function App() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16 py-10 border-y border-white/5">
                           <div className="space-y-3">
                             <p className="text-[10px] text-[#3f3f46] font-black uppercase tracking-[0.4em] flex items-center gap-3">
-                               Publisher Authority
+                                Publisher Authority
                             </p>
                             <p className="text-base font-black text-[#a1a1aa] tracking-tight">{selectedBook.publisher || 'Independent Operator'}</p>
                           </div>
                           <div className="space-y-3">
                             <p className="text-[10px] text-[#3f3f46] font-black uppercase tracking-[0.4em] flex items-center gap-3">
-                               Release Timeline
+                                Release Timeline
                             </p>
                             <p className="text-base font-black text-orange-400/80 tracking-tight">{selectedBook.publishedDate || 'Data Fragmented'}</p>
                           </div>
@@ -738,16 +926,62 @@ export default function App() {
                             {selectedBook.description || "Synthesizing synopsis metadata... No summary available in archival storage. Manual analysis required."}
                           </p>
                         </div>
+
+                        <div className="flex flex-wrap gap-4 mb-12">
+                          <button 
+                            onClick={(e) => {
+                              setReaderBookId(selectedBook.id);
+                              setSelectedBook(null);
+                            }}
+                            className="flex-grow min-w-[200px] h-16 bg-[#34d399] text-black rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
+                          >
+                            <BookOpen size={18} />
+                            Initiate Primary Reader
+                          </button>
+                          
+                          <button 
+                            onClick={() => {
+                              setForensicsBookId(selectedBook.id);
+                              setForensicsQuery('');
+                              setForensicsResults([]);
+                            }}
+                            className="px-8 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all gap-4 text-[10px] font-black uppercase tracking-widest"
+                          >
+                            <Search size={18} className="text-orange-500" />
+                            Keyword Forensics
+                          </button>
+                        </div>
                       </div>
                       
                       <div className="pt-10 border-t border-white/5">
-                         <div className="flex items-center gap-4 p-6 bg-[#34d399]/5 border border-[#34d399]/20 rounded-3xl">
-                            <div className="w-10 h-10 rounded-2xl bg-[#34d399] flex items-center justify-center text-black shadow-[0_0_20px_rgba(52,211,153,0.3)]">
-                               <RefreshCw size={20} className={parseInt(parseProgress(selectedBook.progress)?.percentage) > 0 ? "animate-spin" : ""} />
+                         <div className="flex items-center justify-between p-6 bg-[#34d399]/5 border border-[#34d399]/20 rounded-3xl">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-2xl bg-[#34d399] flex items-center justify-center text-black shadow-[0_0_20px_rgba(52,211,153,0.3)]">
+                                <RefreshCw size={20} className={parseInt(parseProgress(selectedBook.progress)?.percentage) > 0 ? "animate-spin" : ""} />
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-black text-[#34d399] uppercase tracking-widest">KOReader Sync Status</p>
+                                <p className="text-xs font-bold text-white/50 italic">Telemetry derived from connected units.</p>
+                              </div>
                             </div>
-                            <div>
-                               <p className="text-[10px] font-black text-[#34d399] uppercase tracking-widest">KOReader Sync Status</p>
-                               <p className="text-xs font-bold text-white/50 italic">Telemetry derived from connected mobile reading units.</p>
+                            
+                            <div className="flex gap-2">
+                               {selectedBook.status !== 'archived' && (
+                                 <button 
+                                  onClick={() => updateBookStatus(selectedBook.id, 'archived')}
+                                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest hover:text-[#34d399] transition-colors"
+                                 >
+                                    Archive Signal
+                                 </button>
+                               )}
+                               {selectedBook.status !== 'trash' && (
+                                 <button 
+                                  onClick={() => updateBookStatus(selectedBook.id, 'trash')}
+                                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest hover:text-red-400 transition-colors"
+                                 >
+                                    Decommission
+                                 </button>
+                               )}
                             </div>
                          </div>
                       </div>
@@ -1216,6 +1450,102 @@ export default function App() {
           </AnimatePresence>
         </section>
       </main>
+
+      {/* Reader System Overlay */}
+      <AnimatePresence>
+        {readerBookId && (
+          <Reader bookId={readerBookId} onClose={() => setReaderBookId(null)} />
+        )}
+      </AnimatePresence>
+
+      {/* Intra-Document Forensics Overlay */}
+      <AnimatePresence>
+        {forensicsBookId && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm"
+            onClick={() => setForensicsBookId(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 10 }}
+              className="bg-[#111114] border border-white/5 rounded-[3rem] w-full max-w-3xl h-[80vh] flex flex-col overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.8)] relative"
+              onClick={e => e.stopPropagation()}
+            >
+               <div className="p-10 border-b border-white/5 flex items-center justify-between bg-[#111114]/80 backdrop-blur-xl">
+                  <div className="flex items-center gap-6">
+                     <div className="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center">
+                        <Database size={24} className="text-orange-500" />
+                     </div>
+                     <div>
+                        <h3 className="text-xl font-black uppercase tracking-tighter text-white italic">Intra-Document Forensics</h3>
+                        <p className="text-[10px] text-[#52525b] font-black uppercase tracking-[0.2em] mt-1">Scanning Unit: {books.find(b => b.id === forensicsBookId)?.title}</p>
+                     </div>
+                  </div>
+                  <button onClick={() => setForensicsBookId(null)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-[#52525b] hover:text-white transition-all">
+                     <X size={20} />
+                  </button>
+               </div>
+
+               <div className="p-10 bg-black/20 border-b border-white/5">
+                  <div className="relative group">
+                     <Search size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-[#3f3f46] group-focus-within:text-orange-500 transition-colors" />
+                     <input 
+                        type="text" 
+                        placeholder="Enter key identifier or keyword for deep forensic scan..." 
+                        className="w-full bg-[#08080a] border border-white/5 rounded-2xl pl-16 pr-40 py-5 text-base focus:border-orange-500/40 outline-none transition-all placeholder:text-[#27272a] font-medium"
+                        value={forensicsQuery}
+                        onChange={e => setForensicsQuery(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && searchForensics()}
+                     />
+                     <button 
+                      onClick={searchForensics}
+                      disabled={isSearchingForensics}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 px-8 h-12 bg-orange-500 text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-orange-400 active:scale-95 transition-all shadow-xl disabled:opacity-50"
+                     >
+                       {isSearchingForensics ? 'Scanning Unit...' : 'Execute Scan'}
+                     </button>
+                  </div>
+               </div>
+
+               <div className="flex-grow overflow-y-auto p-8 space-y-6 custom-scrollbar bg-[#09090b]">
+                  {forensicsResults.length === 0 ? (
+                     <div className="h-full flex flex-col items-center justify-center opacity-10 gap-8 py-20 text-center">
+                        <Activity size={80} strokeWidth={1} />
+                        <p className="text-sm font-black uppercase tracking-[0.5em]">Zero Correlations Formed</p>
+                     </div>
+                  ) : forensicsResults.map((r, i) => (
+                     <motion.div 
+                      key={i} 
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      className="p-8 rounded-[2rem] bg-white/[0.02] border border-white/5 hover:border-orange-500/20 transition-all group relative overflow-hidden"
+                     >
+                        <div className="absolute top-0 right-0 p-8 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity">
+                            <Layers size={60} />
+                        </div>
+                        <div className="flex items-center justify-between mb-6">
+                           <span className="text-[9px] font-black text-orange-500 uppercase tracking-[0.3em] bg-orange-500/10 px-3 py-1.5 rounded-lg border border-orange-500/20 shadow-lg">DATA CLUSTER #{i+1}</span>
+                           <span className="text-[10px] font-black text-[#52525b] uppercase tracking-widest truncate max-w-[200px]">{r.chapter.split('/').pop()}</span>
+                        </div>
+                        <p className="text-base text-[#a1a1aa] leading-[1.8] font-medium italic">
+                           "...{r.snippet}..."
+                        </p>
+                        <div className="mt-6 pt-6 border-t border-white/5 flex items-center justify-between">
+                            <span className="text-[8px] font-black text-[#3f3f46] uppercase tracking-[0.4em]">Offset Vector: {r.offset}</span>
+                            <button className="text-[9px] font-black text-orange-500/60 uppercase tracking-widest hover:text-orange-500 transition-colors">Point Location</button>
+                        </div>
+                     </motion.div>
+                  ))}
+               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

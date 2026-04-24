@@ -81,6 +81,13 @@ async function startServer() {
         key TEXT PRIMARY KEY,
         value TEXT
       );
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE,
+        displayName TEXT,
+        avatarUrl TEXT,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
       CREATE TABLE IF NOT EXISTS books (
         id TEXT PRIMARY KEY,
         title TEXT,
@@ -90,6 +97,7 @@ async function startServer() {
         publishedDate TEXT,
         language TEXT,
         subject TEXT,
+        aiSector TEXT,
         filePath TEXT,
         coverPath TEXT,
         status TEXT DEFAULT 'library',
@@ -108,6 +116,12 @@ async function startServer() {
         PRIMARY KEY (userId, documentId)
       );
     `);
+
+    // Ensure default user exists if table is empty
+    const usersCount = db.prepare('SELECT count(*) as count FROM users').get() as any;
+    if (usersCount.count === 0) {
+      db.prepare('INSERT INTO users (id, username, displayName) VALUES (?, ?, ?)').run('1', 'admin', 'Master Architect');
+    }
     logToFile('logs/service_log.txt', 'Database tables initialized.');
 
     app.use(express.json());
@@ -121,8 +135,98 @@ async function startServer() {
   // Auth - Simplified for now
   app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
-    // Mock user for now
-    res.json({ token: 'mock-token', user: { id: '1', username: 'admin' } });
+    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any;
+    if (user) {
+      res.json({ token: 'mock-token', user });
+    } else {
+      // Default to the first user if not found for mock purpose
+      const defaultUser = db.prepare('SELECT * FROM users LIMIT 1').get() as any;
+      res.json({ token: 'mock-token', user: defaultUser });
+    }
+  });
+
+  // Users (Profiles)
+  app.get('/api/users', (req, res) => {
+    const users = db.prepare('SELECT * FROM users').all();
+    res.json(users);
+  });
+
+  app.post('/api/users', (req, res) => {
+    const { username, displayName } = req.body;
+    const id = randomUUID();
+    try {
+      db.prepare('INSERT INTO users (id, username, displayName) VALUES (?, ?, ?)').run(id, username, displayName);
+      res.json({ success: true, user: { id, username, displayName } });
+    } catch (e) {
+      res.status(400).json({ error: 'username-taken' });
+    }
+  });
+
+  app.delete('/api/users/:id', (req, res) => {
+    const { id } = req.params;
+    if (id === '1') return res.status(403).json({ error: 'cannot-delete-master' });
+    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    db.prepare('DELETE FROM sync_data WHERE userId = ?').run(id);
+    res.json({ success: true });
+  });
+
+  // Search within book (Intra-Document Forensics)
+  app.get('/api/books/:id/search', (req, res) => {
+    const { id } = req.params;
+    const { q } = req.query;
+    if (!q) return res.status(400).json({ error: 'query-required' });
+    
+    const book = db.prepare('SELECT filePath, format, title FROM books WHERE id = ?').get(id) as any;
+    if (!book || !fs.existsSync(book.filePath)) return res.status(404).json({ error: 'not-found' });
+    
+    if (book.format === 'epub') {
+      try {
+        const zip = new AdmZip(book.filePath);
+        const results: any[] = [];
+        zip.getEntries().forEach(entry => {
+          if (entry.entryName.match(/\.(html|xhtml|xml)$/i) && !entry.entryName.includes('cover') && !entry.entryName.includes('style')) {
+            const content = zip.readAsText(entry);
+            const lowerContent = content.toLowerCase();
+            const lowerQuery = (q as string).toLowerCase();
+            
+            let pos = lowerContent.indexOf(lowerQuery);
+            while (pos !== -1) {
+              const start = Math.max(0, pos - 60);
+              const end = Math.min(content.length, pos + lowerQuery.length + 60);
+              const rawSnippet = content.substring(start, end);
+              // Clean HTML tags for snippet
+              const cleanSnippet = rawSnippet.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+              
+              results.push({ 
+                chapter: entry.entryName, 
+                snippet: cleanSnippet,
+                offset: pos 
+              });
+              
+              if (results.length >= 50) break;
+              pos = lowerContent.indexOf(lowerQuery, pos + lowerQuery.length);
+            }
+          }
+          if (results.length >= 50) return;
+        });
+        res.json({ bookTitle: book.title, results });
+      } catch (e) {
+        res.status(500).json({ error: 'extraction-failed' });
+      }
+    } else {
+      res.status(400).json({ error: 'unsupported-format', message: 'Intra-Document Forensics is currently optimized for EPUB architecture.' });
+    }
+  });
+
+  // Serve book files for local reader
+  app.get('/api/books/:id/file', (req, res) => {
+    const { id } = req.params;
+    const book = db.prepare('SELECT filePath FROM books WHERE id = ?').get(id) as any;
+    if (book && fs.existsSync(book.filePath)) {
+      res.sendFile(book.filePath);
+    } else {
+      res.status(404).send('File not found');
+    }
   });
 
   // Library Scan
@@ -395,7 +499,7 @@ async function startServer() {
 
   app.patch('/api/books/:id', (req, res) => {
     const { id } = req.params;
-    const { status, isReading, progress } = req.body;
+    const { status, isReading, progress, aiSector } = req.body;
     
     const updates: string[] = [];
     const params: any[] = [];
@@ -407,13 +511,13 @@ async function startServer() {
       updates.push('isReading = ?');
       params.push(status === 'reading' ? 1 : 0);
     } else {
-      // Direct isReading update if status is not provided
       if (isReading !== undefined) { 
         updates.push('isReading = ?'); 
         params.push(isReading ? 1 : 0); 
       }
     }
     if (progress !== undefined) { updates.push('progress = ?'); params.push(progress); }
+    if (aiSector !== undefined) { updates.push('aiSector = ?'); params.push(aiSector); }
     
     if (updates.length === 0) return res.status(400).json({ error: 'no updates' });
     
