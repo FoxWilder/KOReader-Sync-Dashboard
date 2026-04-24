@@ -275,6 +275,52 @@ export default function App() {
     }
   };
 
+  const fetchNews = async () => {
+    setFetchingNews(true);
+    try {
+      const res = await fetch('/api/news');
+      const data = await res.json();
+      setNewsItems(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setFetchingNews(false);
+    }
+  };
+
+  const addNewsRepo = async () => {
+    if (!newRepo.includes('/')) {
+      toast.error('Invalid repo format (user/repo)');
+      return;
+    }
+    try {
+      await fetch('/api/news/repos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo: newRepo })
+      });
+      setNewRepo('');
+      fetchNews();
+      toast.success('Repo added');
+    } catch (e) {
+      toast.error('Failed to add repo');
+    }
+  };
+
+  const removeNewsRepo = async (repo: string) => {
+    try {
+      await fetch('/api/news/repos', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo })
+      });
+      fetchNews();
+      toast.success('Repo removed');
+    } catch (e) {
+      toast.error('Failed to remove repo');
+    }
+  };
+
   const fetchSettings = async () => {
     try {
       const res = await fetch('/api/settings');
@@ -384,6 +430,13 @@ export default function App() {
       toast.error('Update deployment failed.', { id: updateToast });
       setUpdating(false);
     }
+  };
+
+  const parseProgress = (progStr?: string) => {
+    if (!progStr) return null;
+    try {
+      return JSON.parse(progStr);
+    } catch (e) { return null; }
   };
 
   const parseProgress = (progStr?: string) => {
@@ -738,6 +791,101 @@ export default function App() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {activeTab === 'news' && (
+              <motion.div 
+                key="news"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-8"
+              >
+                <div className="flex items-center justify-between">
+                  <h2 className="text-3xl font-black italic uppercase tracking-tighter">
+                    Intelligence <span className="text-[#34d399]">Feed</span>
+                  </h2>
+                  <div className="flex gap-4">
+                    <input 
+                      type="text" 
+                      placeholder="user/repo"
+                      value={newRepo}
+                      onChange={(e) => setNewRepo(e.target.value)}
+                      className="bg-[#111114] border border-white/5 px-4 py-2 rounded-xl text-sm outline-none focus:border-[#34d399]/50 transition-all"
+                    />
+                    <button 
+                      onClick={addNewsRepo}
+                      className="bg-white text-black px-6 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#34d399] transition-all"
+                    >
+                      Monitor Repo
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {fetchingNews ? (
+                    <div className="col-span-full h-64 flex items-center justify-center">
+                      <RefreshCw size={40} className="text-[#34d399] animate-spin opacity-20" />
+                    </div>
+                  ) : newsItems.map((item, idx) => (
+                    <motion.div 
+                      key={item.repo}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: idx * 0.1 }}
+                      className="bg-[#111114] border border-white/5 rounded-[2rem] p-8 relative group overflow-hidden shadow-2xl flex flex-col h-full min-h-[400px]"
+                    >
+                      <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                         <Github size={120} />
+                      </div>
+
+                      <div className="flex items-start justify-between mb-8 shrink-0">
+                        <div className="h-14">
+                          <p className="text-[10px] font-black text-[#52525b] uppercase tracking-[0.4em] mb-2">Repository</p>
+                          <h3 className="text-xl font-black text-white truncate max-w-[300px]">{item.repo}</h3>
+                        </div>
+                        <div className="flex gap-2">
+                           <button 
+                            onClick={() => removeNewsRepo(item.repo)}
+                            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-red-500/50 hover:text-red-500 hover:bg-white/10 transition-all border border-white/5"
+                           >
+                             <Trash2 size={16} />
+                           </button>
+                        </div>
+                      </div>
+
+                      <div className="bg-black/40 rounded-2xl p-6 border border-white/5 flex-grow mb-8 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between mb-4 h-6">
+                            <div className="flex items-center gap-3">
+                              <Zap size={16} className="text-orange-400" />
+                              <span className="text-sm font-black text-orange-400">{item.latest.tag_name}</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-[#52525b] uppercase">
+                              {new Date(item.latest.published_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-black text-white mb-3 line-clamp-1">{item.latest.name}</h4>
+                          <p className="text-xs text-[#71717a] line-clamp-4 leading-relaxed overflow-hidden">
+                            {item.latest.body.replace(/[#*`]/g, '')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        <a 
+                          href={item.latest.html_url} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 text-[10px] font-black text-[#34d399] uppercase tracking-widest hover:translate-x-2 transition-transform"
+                        >
+                          View Intel Dossier <ChevronRight size={14} />
+                        </a>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
 
             {activeTab === 'news' && (
               <motion.div 
