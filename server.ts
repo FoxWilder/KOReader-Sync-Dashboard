@@ -446,8 +446,14 @@ async function startServer() {
   });
 
   // Get progress
-  app.get(['/koreader/sync/v1/progress/:documentId', '/koreader-sync-v1/progress/:documentId'], (req, res) => {
-    const { documentId } = req.params;
+  app.get(['/koreader/sync/v1/progress/:documentId', '/koreader-sync-v1/progress/:documentId', '/koreader-sync-v1/progress'], (req, res) => {
+    // Some KOReader clients might send it in query or as a path
+    const documentId = req.params.documentId || req.query.document_id || req.query.documentId;
+    
+    if (!documentId) {
+       return res.status(400).json({ error: 'documentId required' });
+    }
+
     const userId = '1';
     const data = db.prepare('SELECT progress FROM sync_data WHERE userId = ? AND documentId = ?').get(userId, documentId) as any;
     
@@ -460,24 +466,29 @@ async function startServer() {
     }
   });
 
-  // Update progress (Both PUT and POST for maximum compatibility)
+  // Update progress (Prefer PUT, allow POST for maximum compatibility)
   const handleProgressUpdate = (req: express.Request, res: express.Response) => {
     const { documentId } = req.params;
     const { progress, timestamp, document_id } = req.body;
     
-    const finalDocId = documentId || document_id;
+    // Priorities: Path Param > Body document_id > Query document_id
+    const finalDocId = documentId || document_id || req.query.document_id;
     const userId = '1';
 
     if (!finalDocId) {
+      logToFile('sync_log.txt', `UPDATE Progress FAILED: Missing documentId. Body: ${JSON.stringify(req.body)}`);
       return res.status(400).json({ error: 'documentId required' });
     }
 
     // koreader-sync-server usually sends the progress directly in the body OR as a sub-object
-    // We try to normalize here
     let normalizedProgress = progress;
-    if (!normalizedProgress && req.body.xpointer) {
-      // It's a direct progress object
+    if (!normalizedProgress && (req.body.xpointer || req.body.percentage)) {
       normalizedProgress = req.body;
+    }
+
+    if (!normalizedProgress) {
+       logToFile('sync_log.txt', `UPDATE Progress FAILED for ${finalDocId}: No progress data in body`);
+       return res.status(400).json({ error: 'progress data required' });
     }
 
     db.prepare(`
@@ -492,9 +503,10 @@ async function startServer() {
     res.json({ status: 'ok' });
   };
 
-  app.put(['/koreader/sync/v1/progress/:documentId', '/koreader-sync-v1/progress/:documentId'], handleProgressUpdate);
-  app.post(['/koreader/sync/v1/progress', '/koreader-sync-v1/progress'], handleProgressUpdate);
+  app.put(['/koreader/sync/v1/progress/:documentId', '/koreader-sync-v1/progress/:documentId', '/koreader-sync-v1/progress'], handleProgressUpdate);
+  app.post(['/koreader/sync/v1/progress', '/koreader-sync-v1/progress', '/koreader/sync/v1/progress'], handleProgressUpdate);
   app.post(['/koreader/sync/v1/progress/:documentId', '/koreader-sync-v1/progress/:documentId'], handleProgressUpdate);
+  app.patch(['/koreader/sync/v1/progress/:documentId', '/koreader-sync-v1/progress/:documentId'], handleProgressUpdate);
 
 
   // Vite middleware for development

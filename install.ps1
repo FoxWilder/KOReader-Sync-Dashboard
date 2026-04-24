@@ -113,30 +113,31 @@ Invoke-WebRequest -Uri $assetUrl -OutFile $tempFile
 # 5. Stop running processes before deployment to prevent locks
 Write-Log "Stopping any existing Wilder processes..." "Yellow"
 try {
-    # 5a. Port-based kill
-    $portProcess = Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue
-    if ($portProcess) {
-        $pids = $portProcess.OwningProcess | Select-Object -Unique
-        foreach ($p in $pids) {
-            Write-Log "Closing process $p using port 3000..."
-            Stop-Process -Id $p -Force -ErrorAction SilentlyContinue 2>$null
-        }
-    }
+    # Kill anything on port 3000
+    Stop-Process -Id (Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue).OwningProcess -Force -ErrorAction SilentlyContinue
     
-    # 5b. Name/Path based kill (more aggressive)
-    $processes = Get-Process -Name node, tsx -ErrorAction SilentlyContinue | Where-Object { 
-        $_.Path -like "*$installDir*" -or $_.CommandLine -like "*$installDir*" 
+    # Kill any node/tsx/powershell processes related to the install dir
+    $procs = Get-Process -Name node, tsx, powershell -ErrorAction SilentlyContinue | Where-Object { 
+        try { ($_.Path -like "*$installDir*") -or ($_.CommandLine -like "*$installDir*") } catch { $false }
     }
-    if ($processes) {
-        foreach ($proc in $processes) {
-            Write-Log "Terminating lingering process: $($proc.Name) (PID: $($proc.Id))"
-            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue 2>$null
-        }
+    foreach ($p in $procs) {
+        Write-Log "Force-killing process: $($p.Name) (PID: $($p.Id))"
+        Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
     }
-    # Wait for OS to release file locks
-    Start-Sleep -Seconds 3
+
+    # Specifically kill any lingering vite processes
+    Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like "*vite*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+
+    Write-Log "Waiting for OS to release file locks..."
+    Start-Sleep -Seconds 4
+    
+    # Clear Vite cache to prevent "transforming" hangs
+    if (Test-Path "$installDir\node_modules\.vite") {
+        Write-Log "Purging Vite metadata cache..."
+        Remove-Item -Recurse -Force "$installDir\node_modules\.vite" -ErrorAction SilentlyContinue
+    }
 } catch {
-    Write-Log "Warning: Some processes could not be terminated. Upgrade may require manual restart." "Yellow"
+    Write-Log "Warning: Process termination process encountered errors." "Yellow"
 }
 
 # 6. Extract & Deploy
