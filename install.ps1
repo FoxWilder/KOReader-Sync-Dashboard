@@ -25,6 +25,8 @@ function Write-Log([string]$message, [string]$color = "White") {
     $fullMessage = "[$timestamp] $message"
     Write-Host $message -ForegroundColor $color
     if ($logFile) {
+        $parentDir = Split-Path $logFile -Parent
+        if (!(Test-Path $parentDir)) { New-Item -ItemType Directory $parentDir -Force | Out-Null }
         $fullMessage | Out-File -FilePath $logFile -Append -Encoding utf8
     }
 }
@@ -137,6 +139,10 @@ Write-Log "Deploying core files..."
 # Clean app folder but KEEP root scripts for now
 if (Test-Path "$installDir\app") { Remove-Item -Recurse -Force "$installDir\app" }
 New-Item -ItemType Directory -Path "$installDir\app" -Force | Out-Null
+
+# Re-ensure log directory exists immediately after app folder is recreated
+if (!(Test-Path "$appDir\logs")) { New-Item -ItemType Directory "$appDir\logs" -Force | Out-Null }
+
 Expand-Archive -Path $tempFile -DestinationPath "$installDir\app" -Force
 Remove-Item $tempFile
 
@@ -148,6 +154,13 @@ Remove-Item -Recurse $tempDir
 # 7. Setup
 Write-Log "Running infrastructure setup..."
 Set-Location "$installDir\app"
+
+# Ensure dependencies are installed
+if (!(Test-Path "node_modules")) {
+    Write-Log "Installing Node.js dependencies (this may take a minute)..." "Yellow"
+    npm install --omit=dev
+}
+
 if (Test-Path "setup.ps1") { powershell -ExecutionPolicy Bypass -File "setup.ps1" }
 
 # 8. Finalize Root
@@ -158,15 +171,18 @@ Set-Location $installDir
 if (Test-Path "app\run.ps1") { Move-Item "app\run.ps1" "run.ps1" -Force }
 if (Test-Path "app\install.ps1") { Move-Item "app\install.ps1" "install.ps1" -Force }
 
-# Ensure run.ps1 exists
-if (!(Test-Path "run.ps1")) {
-    $runContent = @"
+# Ensure run.ps1 exists and is correct
+$runContent = @"
 # Wilder Sync Dashboard Launcher
 Set-Location "`$PSScriptRoot\app"
-node_modules\.bin\tsx server.ts --prod
-"@
-    Set-Content -Path "run.ps1" -Value $runContent
+if (!(Test-Path "node_modules")) {
+    Write-Host "Dependencies missing. Orchestrating installation..." -ForegroundColor Yellow
+    npm install --omit=dev
 }
+# Execute server using path-safe invocation
+& "node_modules/.bin/tsx" server.ts --prod
+"@
+Set-Content -Path "run.ps1" -Value $runContent
 
 Write-Log "--- SUCCESS: Wilder Sync v$($releaseInfo.tag_name) is ready ---" "Green"
 Write-Log "Launch 'run.ps1' to start the service." "Cyan"
